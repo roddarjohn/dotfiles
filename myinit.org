@@ -269,8 +269,7 @@
    org-agenda
 
    #+BEGIN_SRC emacs-lisp
-     (setq org-agenda-files (list "~/Dropbox/src/orgfiles/cal.org"
-				  "~/Dropbox/src/orgfiles/notes.org"
+     (setq org-agenda-files (list "~/Dropbox/src/orgfiles/notes.org"
 				  "~/Dropbox/src/orgfiles/journal.org"			     
 				  "~/Dropbox/src/orgfiles/i.org"))
 
