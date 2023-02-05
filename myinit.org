@@ -224,31 +224,26 @@
 ** org-capture setup
    org-capture setup.  The fun stuff.
    
-   #+BEGIN_SRC emacs-lisp :tangle no
+   #+BEGIN_SRC emacs-lisp
      (global-set-key (kbd "C-c c") 'org-capture)
 
      (setq org-capture-templates
-           '(("a" "Calendar Item" entry (file+headline  "~/Dropbox/src/orgfiles/cal.org" "Calendar Unfiled")
-              "* %?\n:PROPERTIES:\n\n:END:\n%^T \n %i\n")
-             ("n" "Note" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Notes")
-              "* %?\n%T")
-             ("l" "Link" entry (file+headline "~/Dropbox/src/orgfiles/links.org" "Links")
-              "* %? %^L %^g \n%T" :prepend t)
-             ("t" "To Do Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "To Do Items")
-              "* %?\n:PROPERTIES:\n\n:END:\nSCHEDULED: %^T \n %i\n" :prepend t)
-             ("d" "Deadline Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "Deadlines")
-              "* TODO %?\n:PROPERTIES:\n\n:END:\nDEADLINE: %^T \n %i\n" :prepend t)
-             ("j" "Journal" entry (file+datetree "~/Dropbox/src/orgfiles/journal.org")
-              "* %?\nEntered on %U\n  %i\n  %a")))
+	   '(("n" "Note" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Notes")
+	      "* %?\n%T\n%F\n\n%i")
+	     ("m" "Meeting Note" entry (file+olp+datetree "~/Dropbox/src/orgfiles/notes.org" "Meeting Notes")
+	      "* %?\n\n")
+	     ("l" "Link" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Links")
+	      "* %? %^L \n%T")
+	     ("t" "To Do Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "To Do Items")
+	      "* TODO %?\n %i\n\n" :prepend t)
+	     ("d" "Deadline Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "Deadlines")
+	      "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
+	     ("j" "Journal" entry (file+datetree "~/Dropbox/src/orgfiles/journal.org")
+	      "* %?\nEntered on %U\n  %i\n  %a\n\n")))
    #+END_SRC
 
    #+RESULTS:
-   | a | Calendar Item | entry | (file+headline ~/Dropbox/src/orgfiles/cal.org Calendar Unfiled) | * %?\n:PROPERTIES:\n\n:END:\n%^T \n %i\n                |          |   |
-   | n | Note          | entry | (file+headline ~/Dropbox/src/orgfiles/notes.org Notes)          | * %?\n%T                                                |          |   |
-   | l | Link          | entry | (file+headline ~/Dropbox/src/orgfiles/links.org Links)          | * %? %^L %^g \n%T                                       | :prepend | t |
-   | t | To Do Item    | entry | (file+headline ~/Dropbox/src/orgfiles/i.org To Do Items)        | * %?\n:PROPERTIES:\n\n:END:\nSCHEDULED: %^T \n %i\n     | :prepend | t |
-   | d | Deadline Item | entry | (file+headline ~/Dropbox/src/orgfiles/i.org Deadlines)          | * TODO %?\n:PROPERTIES:\n\n:END:\nDEADLINE: %^T \n %i\n | :prepend | t |
-   | j | Journal       | entry | (file+datetree ~/Dropbox/src/orgfiles/journal.org)              | * %?\nEntered on %U\n  %i\n  %a                         |          |   |
+   | n | Note | entry | (file+headline ~/Dropbox/src/orgfiles/notes.org Notes) | * %? |
 
 ** org-gcal
    org-gcal config.
@@ -273,8 +268,10 @@
 ** org-agenda
    org-agenda
 
-   #+BEGIN_SRC emacs-lisp :tangle no
+   #+BEGIN_SRC emacs-lisp
      (setq org-agenda-files (list "~/Dropbox/src/orgfiles/cal.org"
+				  "~/Dropbox/src/orgfiles/notes.org"
+				  "~/Dropbox/src/orgfiles/journal.org"			     
 				  "~/Dropbox/src/orgfiles/i.org"))
 
      (define-key global-map "\C-ca" 'org-agenda)
