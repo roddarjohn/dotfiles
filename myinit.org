@@ -1,0 +1,311 @@
+#+STARTIP: overview
+
+* Base Setup
+** Interface Setup
+   Sets up the interface
+   - Gets rid of the startup screen
+   - Allows y and n to sub in for yes and no
+   - Allows f5 to reload a file
+
+   #+BEGIN_SRC emacs-lisp
+     (setq inhibit-startup-message t)
+
+     (fset 'yes-or-no-p 'y-or-n-p)
+     (global-set-key (kbd "<f5>") 'revert-buffer)
+
+     (defalias 'list-buffers 'ibuffer-other-window)
+
+     (global-hl-line-mode t)
+
+     (set-face-background 'hl-line "#5e5e5e")
+
+     (use-package beacon
+       :ensure t
+       :config
+       (beacon-mode 1)
+       (setq beacon-color "#666000"))
+
+     (use-package hungry-delete
+       :ensure t
+       :config
+       (global-hungry-delete-mode))
+
+     (add-to-list 'hungry-delete-except-modes 'minibuffer-mode)
+
+     (use-package expand-region
+       :ensure t
+       :config
+       (global-set-key (kbd "C-q") 'er/expand-region))
+
+     (use-package iedit
+       :ensure t
+       :config
+       (global-set-key (kbd "M-q") 'iedit-mode))
+
+     (setq save-interprogram-paste-before-kill t)
+
+     (global-auto-revert-mode 1)
+     (setq auto-revert-verbose nil)
+
+     (add-hook 'before-save-hook 'my-prog-nuke-trailing-whitespace)
+
+     (defun my-prog-nuke-trailing-whitespace ()
+       (when (derived-mode-p 'prog-mode)
+	 (delete-trailing-whitespace)))
+
+     (use-package ace-jump-mode
+       :ensure t
+       :config
+       (define-key global-map (kbd "C-c SPC") 'ace-jump-mode)
+       )
+   #+END_SRC
+
+** which-key
+   Sets up the which-key package
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package which-key
+       :ensure t
+       :config (which-key-mode))
+   #+END_SRC
+
+** zenburn-theme
+   I like the zenburn theme.
+   
+   #+begin_src emacs-lisp
+     (use-package zenburn-theme
+       :ensure t
+       :config (load-theme 'zenburn t))
+   #+end_src
+
+** ace-window
+   ace-window setup.
+
+   #+begin_src emacs-lisp
+     (use-package ace-window
+       :ensure t
+       :init
+       (global-set-key [remap other-window] 'ace-window)
+       )
+
+   #+end_src
+** counsel
+    counsel setup.
+      
+    #+BEGIN_SRC emacs-lisp
+      (use-package counsel
+	:ensure t
+	:bind
+	(("M-y" . counsel-yank-pop)
+	 :map ivy-minibuffer-map
+	 ("M-y" . ivy-next-line)))
+    #+END_SRC
+
+** ivy
+   ivy setup
+   
+   #+BEGIN_SRC emacs-lisp
+     (use-package ivy
+      :ensure t
+      :diminish (ivy-mode)
+      :bind (("C-x b" . ivy-switch-buffer))
+      :config
+      (ivy-mode 1)
+      (setq ivy-use-virtual-buffers t)
+      (setq ivy-count-format "%d/%d ")
+      (setq ivy-display-style 'fancy))
+   #+END_SRC
+
+** swiper
+   swiper setup.
+   
+   #+begin_src emacs-lisp
+       (use-package swiper
+	 :ensure t
+	 :bind (("C-s" . swiper)
+		("C-r" . swiper)
+		("C-c C-r" . ivy-resume)
+		("M-x" . counsel-M-x)
+		("C-x C-f" . counsel-find-file))
+	 :config
+	 (progn
+	   (ivy-mode 1)
+	   (setq ivy-use-virtual-buffers t)
+	   (setq ivy-display-style 'fancy)
+	   (define-key read-expression-map (kbd "C-r") 'counsel-expression-history)
+	   ))
+   #+end_src
+** projectile
+   projectile setup.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package projectile
+       :ensure t
+       :config
+       (projectile-global-mode)
+       (setq projectile-completion-system 'ivy))
+
+     (use-package counsel-projectile
+       :ensure t
+       :config
+       (counsel-projectile-mode))
+
+     (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+   #+END_SRC
+** magit
+   magit (git) setup.  For some reason the keybinding wasn't working by default (unsure if this is desired behavior or not), but I added it manually.
+
+   #+BEGIN_SRC emacs-lisp
+     (use-package magit
+       :ensure t
+       :config
+       (global-set-key (kbd "C-c g") 'magit-status)
+       )
+   #+END_SRC
+
+   #+RESULTS:
+   : t
+
+* Various Language Environment Setups
+** New Python Setup
+#+BEGIN_SRC emacs-lisp
+  (use-package elpy
+    :ensure t
+    :init
+    (elpy-enable))
+
+  (add-hook 'elpy-mode-hook (lambda ()
+			      (add-hook 'before-save-hook
+					'elpy-black-fix-code nil t)))
+
+  (when (load "flycheck" t t)
+    (setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
+    (add-hook 'elpy-mode-hook 'flycheck-mode))
+
+  (setq python-flymake-command '("/Users/rjohn/.pyenv/shims/flake8" "--config=/Users/rjohn/flake8.ini" "-"))  
+  (setq python-check-command "/Users/rjohn/.pyenv/shims/flake8 --config=/Users/rjohn/flake8.ini")
+  (setq elpy-syntax-check-command python-check-command)
+
+  (use-package importmagic
+      :ensure t
+      :config
+      (add-hook 'python-mode-hook 'importmagic-mode))
+
+  (define-key importmagic-mode-map (kbd "C-c C-l") 'importmagic-fix-symbol-at-point)
+  ; (setq importmagic-be-quiet t)
+  ; (add-to-list 'ivy-ignore-buffers "\\*epc con")
+
+  (setq flycheck-flake8rc "/Users/rjohn/flake8.ini")
+
+  (setq importmagic-configuration-style-alist '(
+						(multiline . parentheses)
+						(max_columns . 100)
+						)
+	)
+#+END_SRC
+
+#+RESULTS:
+: ((multiline . parentheses) (max_columns . 100))
+
+* org-mode setup
+** org-bullets
+   org-bullets setup.
+
+   #+begin_src emacs-lisp
+     (use-package org-bullets
+	 :ensure t
+	 :config
+	 (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1))))
+
+   #+end_src
+** Reveal.js
+   reveal.js setup
+   
+** org-capture setup
+   org-capture setup.  The fun stuff.
+   
+   #+BEGIN_SRC emacs-lisp :tangle no
+     (global-set-key (kbd "C-c c") 'org-capture)
+
+     (setq org-capture-templates
+           '(("a" "Calendar Item" entry (file+headline  "~/Dropbox/src/orgfiles/cal.org" "Calendar Unfiled")
+              "* %?\n:PROPERTIES:\n\n:END:\n%^T \n %i\n")
+             ("n" "Note" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Notes")
+              "* %?\n%T")
+             ("l" "Link" entry (file+headline "~/Dropbox/src/orgfiles/links.org" "Links")
+              "* %? %^L %^g \n%T" :prepend t)
+             ("t" "To Do Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "To Do Items")
+              "* %?\n:PROPERTIES:\n\n:END:\nSCHEDULED: %^T \n %i\n" :prepend t)
+             ("d" "Deadline Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "Deadlines")
+              "* TODO %?\n:PROPERTIES:\n\n:END:\nDEADLINE: %^T \n %i\n" :prepend t)
+             ("j" "Journal" entry (file+datetree "~/Dropbox/src/orgfiles/journal.org")
+              "* %?\nEntered on %U\n  %i\n  %a")))
+   #+END_SRC
+
+   #+RESULTS:
+   | a | Calendar Item | entry | (file+headline ~/Dropbox/src/orgfiles/cal.org Calendar Unfiled) | * %?\n:PROPERTIES:\n\n:END:\n%^T \n %i\n                |          |   |
+   | n | Note          | entry | (file+headline ~/Dropbox/src/orgfiles/notes.org Notes)          | * %?\n%T                                                |          |   |
+   | l | Link          | entry | (file+headline ~/Dropbox/src/orgfiles/links.org Links)          | * %? %^L %^g \n%T                                       | :prepend | t |
+   | t | To Do Item    | entry | (file+headline ~/Dropbox/src/orgfiles/i.org To Do Items)        | * %?\n:PROPERTIES:\n\n:END:\nSCHEDULED: %^T \n %i\n     | :prepend | t |
+   | d | Deadline Item | entry | (file+headline ~/Dropbox/src/orgfiles/i.org Deadlines)          | * TODO %?\n:PROPERTIES:\n\n:END:\nDEADLINE: %^T \n %i\n | :prepend | t |
+   | j | Journal       | entry | (file+datetree ~/Dropbox/src/orgfiles/journal.org)              | * %?\nEntered on %U\n  %i\n  %a                         |          |   |
+
+** org-gcal
+   org-gcal config.
+
+   Some sort of duplication problem, working on it...  As of now it doesn't work.
+
+   #+BEGIN_SRC emacs-lisp :tangle no
+     (setq package-check-signature nil)
+
+     (use-package org-gcal
+       :ensure t
+       :config
+       (setq org-gcal-client-id "CLIENT ID"
+	     org-gcal-client-secret "SECRET"
+	     org-gcal-file-alist '(("johnrod.john@gmail.com" . "~/Dropbox/src/orgfiles/cal.org"))))
+
+   #+END_SRC
+
+   #+RESULTS:
+   : t
+
+** org-agenda
+   org-agenda
+
+   #+BEGIN_SRC emacs-lisp :tangle no
+     (setq org-agenda-files (list "~/Dropbox/src/orgfiles/cal.org"
+				  "~/Dropbox/src/orgfiles/i.org"))
+
+     (define-key global-map "\C-ca" 'org-agenda)
+
+     (setq org-agenda-custom-commands
+	   '(("c" "Simple agenda view"
+	      ((agenda "")
+	       (alltodo "")))))
+   #+END_SRC
+
+   #+RESULTS:
+   | c | Simple agenda view | ((agenda ) (alltodo )) |
+
+* Shortcuts to remember
+  - C-( starts a macro
+  - C-) stops a macro
+  - C-e runs a macro
+  - C-, C-. C-? for python documentation
+  - C-x u for undo tree
+  - <s-TAB
+  - C-q expand-region thing
+  - M-q iedit mode
+  - C-x n narrow-widen-dwim
+  - C-c C-e w surrounds marked area in html tag
+  - C-c C-f folds html
+
+** Things to Look Into
+*** DONE elpy
+*** DONE Look more into dumb-jump re c++ and c
+
+
+
+   
+   
