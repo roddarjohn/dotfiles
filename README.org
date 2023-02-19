@@ -9,17 +9,17 @@ Hello!  Welcome to a little repository that in general contains the files I use 
 ** emacs
 Setting up emacs in this way is a two step process.
 
-I use org-mode to store my emacs configuration, this has a few benefits:
-1. Super easy to read / write within org-mode (collapsing headers, etc)
-2. You can easily turn on and off inclusion in the current running instance of emacs through :tangle no tags for the SRC blocks
+I use ~org-mode~ to store my emacs configuration, this has a few benefits:
+1. Super easy to read / write within ~org-mode~ (collapsing headers, etc)
+2. You can easily turn on and off inclusion in the current running instance of emacs through ~:tangle no~ tags for the SRC blocks
 
 In order to get started:
-1. Place init.el in your ~ directory
-2. Place myinit.org in your ~/.emacs.d/ directory
+1. Place ~init.el~ in your ~~~ directory
+2. Place ~myinit.org~ in your ~~/.emacs.d/~ directory
 
 Boot up emacs.
 ** zsh
-zsh -> ~/.zshrc
+~zsh~ -> ~~/.zshrc~
 
 ** tmux
-tmux.conf -> ~/.tmux.conf
+~tmux.conf~ -> ~~/.tmux.conf~
