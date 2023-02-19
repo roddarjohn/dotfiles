@@ -443,12 +443,7 @@
   - M-q iedit mode
   - C-x n narrow-widen-dwim
   - C-c C-e w surrounds marked area in html tag
-  - C-c C-f folds html
-
-** Things to Look Into
-*** DONE elpy
-*** DONE Look more into dumb-jump re c++ and c
-    
+  - C-c C-f folds html   
 
 
    
