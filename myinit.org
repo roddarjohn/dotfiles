@@ -133,12 +133,15 @@
 
    #+RESULTS:
    : t
-
-** mode-line
+** all-the-icons
 #+begin_src emacs-lisp
   (use-package all-the-icons
     :ensure t
+    :if (display-graphic-p)
     )
+
+    ;; (all-the-icons-install-fonts)
+    ;; uncomment the above on first installation
 
   (use-package fontset
     :ensure t
@@ -147,9 +150,12 @@
     (when (member "Symbola" (font-family-list))
       (set-fontset-font
        t 'symbol "Symbola" nil)))
+#+end_src
 
-       ;; (display-time-mode t) ;; required to show time in the mode line
-
+#+RESULTS:
+: t
+** mode-line
+#+begin_src emacs-lisp
   (use-package lambda-line
     :ensure t
     :straight (:type git :host github :repo "lambda-emacs/lambda-line") 
@@ -426,7 +432,7 @@
 			       "~/Dropbox/src/orgfiles/journal.org"			     
 			       "~/Dropbox/src/orgfiles/i.org"))
 
-  (define-key global-map "\C-ca" 'org-agenda)
+  (global-set-key (kbd "C-c a") 'org-agenda)
 
   (setq org-agenda-custom-commands
 	'(("c" "Simple agenda view"
