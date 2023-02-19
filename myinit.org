@@ -112,24 +112,29 @@
        :config (which-key-mode))
    #+END_SRC
 
-** zenburn-theme
-   I like the zenburn theme.
-   
+** theme
    #+begin_src emacs-lisp
-     (use-package zenburn-theme
-       :ensure t
-       :config (load-theme 'zenburn t))
+  (use-package flatland-theme
+    :ensure t
+    :config (load-theme 'flatland t))
 
-     (load-theme 'wombat t)
+  (menu-bar-mode -1)
+  (tool-bar-mode -1)
+  (scroll-bar-mode -1)
 
-     (menu-bar-mode -1)
-     (tool-bar-mode -1)
-     (scroll-bar-mode -1)
+  (use-package rainbow-delimiters
+    :ensure t
+    :config
+    (add-hook 'python-mode-hook 'rainbow-delimiters-mode)
+    (add-hook 'emacs-lisp-mode 'rainbow-delimiters-mode)
+    (add-hook 'lisp-mode 'rainbow-delimiters-mode)
+    )
    #+end_src
 
    #+RESULTS:
+   : t
 
-** mode-line                                                       
+** mode-line
 #+begin_src emacs-lisp
   (use-package all-the-icons
     :ensure t
