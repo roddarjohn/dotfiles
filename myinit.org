@@ -18,6 +18,18 @@
 
 #+RESULTS:
 : quelpa-use-package
+** quality of life
+#+begin_src emacs-lisp
+  (setq gc-cons-threshold 100000000)
+
+  (use-package dimmer
+    :custom (dimmer-fraction 0.3)
+    :config (dimmer-mode))
+#+end_src
+
+#+RESULTS:
+: 100000000
+
 ** straight
 #+begin_src emacs-lisp
   (defvar bootstrap-version)
@@ -35,7 +47,7 @@
 #+end_src
 
 ** Interface Setup
-   Sets up the interface
+   Sets up the interface   
 
    #+BEGIN_SRC emacs-lisp
      (setq inhibit-startup-message t)
@@ -294,7 +306,91 @@
    #+RESULTS:
    : t
 
+** centaur
+#+begin_src emacs-lisp :tangle no
+  (use-package all-the-icons
+    :ensure t
+    )
+
+  (use-package centaur-tabs
+    :ensure t
+    :init
+    (setq centaur-tabs-enable-key-bindings t)
+    :config
+    (setq centaur-tabs-style "bar"
+	  centaur-tabs-height 32
+	  centaur-tabs-set-icons t
+	  centaur-tabs-show-new-tab-button t
+	  centaur-tabs-set-modified-marker t
+	  centaur-tabs-set-bar 'under
+	  centaur-tabs-show-count nil
+	  x-underline-at-descent-line t
+	  centaur-tabs-left-edge-margin nil)
+    (centaur-tabs-change-fonts (face-attribute 'default :font) 110)
+    (centaur-tabs-headline-match)
+    ;; (centaur-tabs-enable-buffer-alphabetical-reordering)
+    ;; (setq centaur-tabs-adjust-buffer-order t)
+    (centaur-tabs-mode t)
+    (setq uniquify-separator "/")
+    (setq uniquify-buffer-name-style 'forward)
+    (defun centaur-tabs-buffer-groups ()
+      (list
+       (cond
+	((or (string-equal "*" (substring (buffer-name) 0 1))
+	     (memq major-mode '(magit-process-mode
+				magit-status-mode
+				magit-diff-mode
+				magit-log-mode
+				magit-file-mode
+				magit-blob-mode
+				magit-blame-mode
+				)))
+	 "Emacs")
+	((derived-mode-p 'prog-mode)
+	 "Editing")
+	((derived-mode-p 'dired-mode)
+	 "Dired")
+	((memq major-mode '(helpful-mode
+			    help-mode))
+	 "Help")
+	((memq major-mode '(org-mode
+			    org-agenda-clockreport-mode
+			    org-src-mode
+			    org-agenda-mode
+			    org-beamer-mode
+			    org-indent-mode
+			    org-bullets-mode
+			    org-cdlatex-mode
+			    org-agenda-log-mode
+			    diary-mode))
+	 "OrgMode")
+	(t
+	 (centaur-tabs-get-group-name (current-buffer))))))
+    :hook
+    (dashboard-mode . centaur-tabs-local-mode)
+    (calendar-mode . centaur-tabs-local-mode)
+    (org-agenda-mode . centaur-tabs-local-mode)
+    :bind
+    ("C-x t o" . centaur-tabs-ace-jump)
+    )
+#+end_src
+
+#+RESULTS:
+: centaur-tabs-ace-jump
+
 * Various Language Environment Setups
+** Mac OS X Configuration
+#+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :ensure t
+    :init
+    (when (memq window-system '(mac ns x))
+      (exec-path-from-shell-initialize))
+    )
+#+end_src
+
+#+RESULTS:
+: ((MANPATH . /Users/rjohn/.nvm/versions/node/v16.10.0/share/man:/opt/homebrew/share/man::) (PATH . /opt/homebrew/opt/openssl@3/bin:/Users/rjohn/.pyenv/shims:/Users/rjohn/.nvm/versions/node/v16.10.0/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/rjohn/.local/bin:/Users/rjohn/.local/bin))
 ** [elpy] New Python Setup
 #+BEGIN_SRC emacs-lisp
   (use-package elpy
@@ -314,15 +410,6 @@
   (setq python-check-command "/Users/rjohn/.pyenv/shims/flake8 --config=/Users/rjohn/flake8.ini")
   (setq elpy-syntax-check-command python-check-command)
 
-  (use-package importmagic
-      :ensure t
-      :config
-      (add-hook 'python-mode-hook 'importmagic-mode))
-
-  (define-key importmagic-mode-map (kbd "C-c C-l") 'importmagic-fix-symbol-at-point)
-  ; (setq importmagic-be-quiet t)
-  ; (add-to-list 'ivy-ignore-buffers "\\*epc con")
-
   (setq flycheck-flake8rc "/Users/rjohn/flake8.ini")
 
   (defun company-yasnippet-or-completion ()
@@ -339,10 +426,25 @@
 	       'company-yasnippet-or-completion
 	       company-active-map)))
 
+  (setq elpy-rpc-ignored-buffer-size 102400000)
+
+  (setq flycheck-checker-error-threhold 10000)
+
 #+END_SRC
 
 #+RESULTS:
-| (lambda nil (substitute-key-definition 'company-complete-common 'company-yasnippet-or-completion company-active-map)) | company-mode-set-explicitly |
+: 10000
+
+#+begin_src emacs-lisp :tangle no
+    (use-package importmagic
+	:ensure t
+	:config
+	(add-hook 'python-mode-hook 'importmagic-mode))
+
+    (define-key importmagic-mode-map (kbd "C-c C-l") 'importmagic-fix-symbol-at-point)
+    ; (setq importmagic-be-quiet t)
+    ; (add-to-list 'ivy-ignore-buffers "\\*epc con")
+#+end_src
 
 * org-mode setup
 ** org-modern
@@ -375,22 +477,22 @@
      (global-set-key (kbd "C-c c") 'org-capture)
 
      (setq org-capture-templates
-	   '(("n" "Note" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Notes")
+	   '(("n" "Note" entry (file+headline "~/org/src/orgfiles/notes.org" "Notes")
 	      "* %?\n%T\n%F\n\n%i")
-	     ("m" "Meeting Note" entry (file+olp+datetree "~/Dropbox/src/orgfiles/notes.org" "Meeting Notes")
+	     ("m" "Meeting Note" entry (file+olp+datetree "~/org/src/orgfiles/notes.org" "Meeting Notes")
 	      "* %?\n\n")
-	     ("l" "Link" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Links")
+	     ("l" "Link" entry (file+headline "~/org/src/orgfiles/notes.org" "Links")
 	      "* %? %^L \n%T")
-	     ("t" "To Do Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "To Do Items")
+	     ("t" "To Do Item" entry (file+headline "~/org/src/orgfiles/i.org" "To Do Items")
 	      "* TODO %?\n %i\n\n" :prepend t)
-	     ("d" "Deadline Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "Deadlines")
+	     ("d" "Deadline Item" entry (file+headline "~/org/src/orgfiles/i.org" "Deadlines")
 	      "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
-	     ("j" "Journal" entry (file+datetree "~/Dropbox/src/orgfiles/journal.org")
+	     ("j" "Journal" entry (file+datetree "~/org/src/orgfiles/journal.org")
 	      "* %?\nEntered on %U\n  %i\n  %a\n\n")))
    #+END_SRC
 
    #+RESULTS:
-   | n | Note | entry | (file+headline ~/Dropbox/src/orgfiles/notes.org Notes) | * %? |
+   | n | Note | entry | (file+headline ~/org/src/orgfiles/notes.org Notes) | * %? |
 
 ** org-gcal
    org-gcal config.
@@ -405,7 +507,7 @@
        :config
        (setq org-gcal-client-id "CLIENT ID"
 	     org-gcal-client-secret "SECRET"
-	     org-gcal-file-alist '(("johnrod.john@gmail.com" . "~/Dropbox/src/orgfiles/cal.org"))))
+	     org-gcal-file-alist '(("johnrod.john@gmail.com" . "~/org/src/orgfiles/cal.org"))))
 
    #+END_SRC
 
@@ -428,9 +530,9 @@
 #+end_src
 
    #+BEGIN_SRC emacs-lisp
-  (setq org-agenda-files (list "~/Dropbox/src/orgfiles/notes.org"
-			       "~/Dropbox/src/orgfiles/journal.org"			     
-			       "~/Dropbox/src/orgfiles/i.org"))
+  (setq org-agenda-files (list "~/org/src/orgfiles/notes.org"
+			       "~/org/src/orgfiles/journal.org"			     
+			       "~/org/src/orgfiles/i.org"))
 
   (global-set-key (kbd "C-c a") 'org-agenda)
 
