@@ -1,53 +1,45 @@
-#+STARTIP: overview
+#+STARTUP: overview
 
 * Base Setup
-** quelpa
-#+begin_src emacs-lisp
-  (unless (package-installed-p 'quelpa)
-    (with-temp-buffer
-      (url-insert-file-contents "https://raw.githubusercontent.com/quelpa/quelpa/master/quelpa.el")
-      (eval-buffer)
-      (quelpa-self-upgrade)))
+** Package Manager
+*** quelpa
+ #+begin_src emacs-lisp
+   (unless (package-installed-p 'quelpa)
+     (with-temp-buffer
+       (url-insert-file-contents "https://raw.githubusercontent.com/quelpa/quelpa/master/quelpa.el")
+       (eval-buffer)
+       (quelpa-self-upgrade)))
 
-  (quelpa
-   '(quelpa-use-package
-     :fetcher git
-     :url "https://github.com/quelpa/quelpa-use-package.git"))
-  (require 'quelpa-use-package)
-#+end_src
+   (quelpa
+    '(quelpa-use-package
+      :fetcher git
+      :url "https://github.com/quelpa/quelpa-use-package.git"))
+   (require 'quelpa-use-package)
+ #+end_src
 
-#+RESULTS:
-: quelpa-use-package
-** quality of life
-#+begin_src emacs-lisp
-  (setq gc-cons-threshold 100000000)
+ #+RESULTS:
+ : quelpa-use-package
+*** straight
+ #+begin_src emacs-lisp
+   (defvar bootstrap-version)
+   (let ((bootstrap-file
+	  (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+	 (bootstrap-version 6))
+     (unless (file-exists-p bootstrap-file)
+       (with-current-buffer
+	   (url-retrieve-synchronously
+	    "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+	    'silent 'inhibit-cookies)
+	 (goto-char (point-max))
+	 (eval-print-last-sexp)))
+     (load bootstrap-file nil 'nomessage))
+ #+end_src
 
-  (use-package dimmer
-    :custom (dimmer-fraction 0.3)
-    :config (dimmer-mode))
-#+end_src
-
-#+RESULTS:
-: 100000000
-
-** straight
-#+begin_src emacs-lisp
-  (defvar bootstrap-version)
-  (let ((bootstrap-file
-	 (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-	(bootstrap-version 6))
-    (unless (file-exists-p bootstrap-file)
-      (with-current-buffer
-	  (url-retrieve-synchronously
-	   "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
-	   'silent 'inhibit-cookies)
-	(goto-char (point-max))
-	(eval-print-last-sexp)))
-    (load bootstrap-file nil 'nomessage))
-#+end_src
+ #+RESULTS:
+ : t
 
 ** Interface Setup
-   Sets up the interface   
+   Sets up the interface
 
    #+BEGIN_SRC emacs-lisp
      (setq inhibit-startup-message t)
@@ -89,13 +81,17 @@
      (global-auto-revert-mode 1)
      (setq auto-revert-verbose nil)
 
-     (add-hook 'before-save-hook 'my-prog-nuke-trailing-whitespace)
+     (add-hook 'before-save-hook 'my-prog-nuke-trailing-whitespace)       
 
      (defun my-prog-nuke-trailing-whitespace ()
        (when (derived-mode-p 'prog-mode)
 	 (delete-trailing-whitespace)))
 
    #+END_SRC
+
+   #+RESULTS:
+   : my-prog-nuke-trailing-whitespace
+
 ** avy
 #+begin_src emacs-lisp
   (use-package avy
@@ -113,7 +109,7 @@
 #+end_src
 
 #+RESULTS:
-| (lambda nil (local-unset-key (kbd C-c SPC))) | (lambda nil (org-bullets-mode 1)) | #[0 \301\211\207 [imenu-create-index-function org-imenu-get-tree] 2] | er/add-org-mode-expansions | #[0 \300\301\302\303\304$\207 [add-hook change-major-mode-hook org-show-all append local] 5] | #[0 \300\301\302\303\304$\207 [add-hook change-major-mode-hook org-babel-show-result-all append local] 5] | org-babel-result-hide-spec | org-babel-hide-all-hashes |
+| org-modern-mode | #[0 \301\211\207 [imenu-create-index-function org-imenu-get-tree] 2] | (lambda nil (local-unset-key (kbd C-c SPC))) | er/add-org-mode-expansions | #[0 \300\301\302\303\304$\207 [add-hook change-major-mode-hook org-show-all append local] 5] | #[0 \300\301\302\303\304$\207 [add-hook change-major-mode-hook org-babel-show-result-all append local] 5] | org-babel-result-hide-spec | org-babel-hide-all-hashes |
 
 ** which-key
    Sets up the which-key package
@@ -145,136 +141,223 @@
 
    #+RESULTS:
    : t
-** all-the-icons
-#+begin_src emacs-lisp
-  (use-package all-the-icons
-    :ensure t
-    :if (display-graphic-p)
-    )
-
-    ;; (all-the-icons-install-fonts)
-    ;; uncomment the above on first installation
-
-  (use-package fontset
-    :ensure t
-    :straight (:type built-in)
-    :config
-    (when (member "Symbola" (font-family-list))
-      (set-fontset-font
-       t 'symbol "Symbola" nil)))
-#+end_src
-
-#+RESULTS:
-: t
-** mode-line
-#+begin_src emacs-lisp
-  (use-package lambda-line
-    :ensure t
-    :straight (:type git :host github :repo "lambda-emacs/lambda-line") 
-    :custom
-    (lambda-line-vc-symbol " | ")
-    (lambda-line-icon-time -1)
-    (lambda-line-position 'bottom) ;; Set position of status-line 
-    (lambda-line-abbrev t) ;; abbreviate major modes
-    (lambda-line-hspace "  ")  ;; add some cushion
-    (lambda-line-prefix t) ;; use a prefix symbol
-    (lambda-line-prefix-padding nil) ;; no extra space for prefix 
-    (lambda-line-status-invert nil)  ;; no invert colors
-    (lambda-line-gui-ro-symbol  " ⨂") ;; symbols
-    (lambda-line-gui-mod-symbol " ⬤") 
-    (lambda-line-gui-rw-symbol  " ◯") 
-    (lambda-line-space-top +.30)  ;; padding on top and bottom of line
-    (lambda-line-space-bottom -.30)
-    (lambda-line-symbol-position 0.1) ;; adjust the vertical placement of symbol
-    (lambda-line-git-diff-mode-line t)
-    (lambda-line-syntax t)
-    :config
-    ;; activate lambda-line 
-    (lambda-line-mode)
-    )
-#+end_src
-
-#+RESULTS:
-: t
-
 ** ace-window
-   ace-window setup.
-
    #+begin_src emacs-lisp
-     (use-package ace-window
-       :ensure t
-       :init
-       (global-set-key [remap other-window] 'ace-window)
-       )
+  (use-package ace-window
+    :ensure t
+    :init
+    (global-set-key [remap other-window] 'ace-window)
+    (setq aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+    )
 
-   #+end_src
+   #+END_src
 
-   #+RESULTS:
-   : ace-window
+#+RESULTS:
+** consult
 
-** counsel
-    counsel setup.
-      
-    #+BEGIN_SRC emacs-lisp
-      (use-package counsel
-	:ensure t
-	:bind
-	(("M-y" . counsel-yank-pop)
-	 :map ivy-minibuffer-map
-	 ("M-y" . ivy-next-line)))
-    #+END_SRC
+#+begin_src emacs-lisp
+  ;; Example configuration for Consult
+  (use-package consult
+    :ensure t
+    ;; Replace bindings. Lazily loaded due by `use-package'.
+    :bind (;; C-c bindings in `mode-specific-map'
+	   ("C-c M-x" . consult-mode-command)
+	   ("C-c h" . consult-history)
+	   ("C-c k" . consult-kmacro)
+	   ("C-c m" . consult-man)
+	   ("C-c i" . consult-info)
+	   ([remap Info-search] . consult-info)
+	   ;; C-x bindings in `ctl-x-map'
+	   ("C-x M-:" . consult-complex-command)     ;; orig. repeat-complex-command
+	   ("C-x b" . consult-buffer)                ;; orig. switch-to-buffer
+	   ("C-x 4 b" . consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
+	   ("C-x 5 b" . consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
+	   ("C-x r b" . consult-bookmark)            ;; orig. bookmark-jump
+	   ("C-x p b" . consult-project-buffer)      ;; orig. project-switch-to-buffer
+	   ;; Custom M-# bindings for fast register access
+	   ("M-#" . consult-register-load)
+	   ("M-'" . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
+	   ("C-M-#" . consult-register)
+	   ;; Other custom bindings
+	   ("M-y" . consult-yank-pop)                ;; orig. yank-pop
+	   ;; M-g bindings in `goto-map'
+	   ("M-g e" . consult-compile-error)
+	   ("M-g f" . consult-flymake)               ;; Alternative: consult-flycheck
+	   ;; ("M-g g" . consult-goto-line)             ;; orig. goto-line -- interferes with avy
+	   ("M-g M-g" . consult-goto-line)           ;; orig. goto-line
+	   ("M-g o" . consult-outline)               ;; Alternative: consult-org-heading
+	   ("M-g m" . consult-mark)
+	   ("M-g k" . consult-global-mark)
+	   ("M-g i" . consult-imenu)
+	   ("M-g I" . consult-imenu-multi)
+	   ;; M-s bindings in `search-map'
+	   ("M-s d" . consult-find)                  ;; Alternative: consult-fd
+	   ("M-s D" . consult-locate)
+	   ("M-s g" . consult-grep)
+	   ("M-s G" . consult-git-grep)
+	   ("M-s r" . consult-ripgrep)
+	   ("C-s"   . consult-line)
+	   ("M-s l" . consult-line)
+	   ("M-s L" . consult-line-multi)
+	   ("M-s k" . consult-keep-lines)
+	   ("M-s u" . consult-focus-lines)
+	   ;; Isearch integration
+	   ("M-s e" . consult-isearch-history)
+	   :map isearch-mode-map
+	   ("M-e" . consult-isearch-history)         ;; orig. isearch-edit-string
+	   ("M-s e" . consult-isearch-history)       ;; orig. isearch-edit-string
+	   ("M-s l" . consult-line)                  ;; needed by consult-line to detect isearch
+	   ("M-s L" . consult-line-multi)            ;; needed by consult-line to detect isearch
+	   ;; Minibuffer history
+	   :map minibuffer-local-map
+	   ("M-s" . consult-history)                 ;; orig. next-matching-history-element
+	   ("M-r" . consult-history))                ;; orig. previous-matching-history-element
 
-** ivy
-   ivy setup
-   
-   #+BEGIN_SRC emacs-lisp
-     (use-package ivy
-      :ensure t
-      :diminish (ivy-mode)
-      :bind (("C-x b" . ivy-switch-buffer))
-      :config
-      (ivy-mode 1)
-      (setq ivy-use-virtual-buffers t)
-      (setq ivy-count-format "%d/%d ")
-      (setq ivy-display-style 'fancy))
-   #+END_SRC
+    ;; Enable automatic preview at point in the *Completions* buffer. This is
+    ;; relevant when you use the default completion UI.
+    :hook (completion-list-mode . consult-preview-at-point-mode)
 
-** swiper
-   swiper setup.
-   
-   #+begin_src emacs-lisp
-       (use-package swiper
-	 :ensure t
-	 :bind (("C-s" . swiper)
-		("C-r" . swiper)
-		("C-c C-r" . ivy-resume)
-		("M-x" . counsel-M-x)
-		("C-x C-f" . counsel-find-file))
-	 :config
-	 (progn
-	   (ivy-mode 1)
-	   (setq ivy-use-virtual-buffers t)
-	   (setq ivy-display-style 'fancy)
-	   (define-key read-expression-map (kbd "C-r") 'counsel-expression-history)
-	   ))
-   #+end_src
+    ;; The :init configuration is always executed (Not lazy)
+    :init
+
+    ;; Optionally configure the register formatting. This improves the register
+    ;; preview for `consult-register', `consult-register-load',
+    ;; `consult-register-store' and the Emacs built-ins.
+    (setq register-preview-delay 0.5
+	  register-preview-function #'consult-register-format)
+
+    ;; Optionally tweak the register preview window.
+    ;; This adds thin lines, sorting and hides the mode line of the window.
+    (advice-add #'register-preview :override #'consult-register-window)
+
+    ;; Use Consult to select xref locations with preview
+    (setq xref-show-xrefs-function #'consult-xref
+	  xref-show-definitions-function #'consult-xref)
+
+    ;; Configure other variables and modes in the :config section,
+    ;; after lazily loading the package.
+    :config
+
+    ;; Optionally configure preview. The default value
+    ;; is 'any, such that any key triggers the preview.
+    ;; (setq consult-preview-key 'any)
+    ;; (setq consult-preview-key "M-.")
+    ;; (setq consult-preview-key '("S-<down>" "S-<up>"))
+    ;; For some commands and buffer sources it is useful to configure the
+    ;; :preview-key on a per-command basis using the `consult-customize' macro.
+    (consult-customize
+     consult-theme :preview-key '(:debounce 0.2 any)
+     consult-ripgrep consult-git-grep consult-grep
+     consult-bookmark consult-recent-file consult-xref
+     consult--source-bookmark consult--source-file-register
+     consult--source-recent-file consult--source-project-recent-file
+     ;; :preview-key "M-."
+     :preview-key '(:debounce 0.4 any))
+
+    ;; Optionally configure the narrowing key.
+    ;; Both < and C-+ work reasonably well.
+    (setq consult-narrow-key "<") ;; "C-+"
+  )
+#+end_src
+
+#+RESULTS:
+: consult-history
+
+** vertico
+#+begin_src emacs-lisp
+  (use-package vertico
+    :ensure t
+      :init
+      (vertico-mode)
+  (setq completion-styles '(substring basic))
+      )
+
+    (use-package savehist
+      :init
+      (savehist-mode))
+
+    ;; A few more useful configurations...
+    (use-package emacs
+      :init
+      ;; Add prompt indicator to `completing-read-multiple'.
+      ;; We display [CRM<separator>], e.g., [CRM,] if the separator is a comma.
+      (defun crm-indicator (args)
+	(cons (format "[CRM%s] %s"
+		      (replace-regexp-in-string
+		       "\\`\\[.*?]\\*\\|\\[.*?]\\*\\'" ""
+		       crm-separator)
+		      (car args))
+	      (cdr args)))
+      (advice-add #'completing-read-multiple :filter-args #'crm-indicator)
+
+      ;; Do not allow the cursor in the minibuffer prompt
+      (setq minibuffer-prompt-properties
+	    '(read-only t cursor-intangible t face minibuffer-prompt))
+      (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
+
+      ;; Emacs 28: Hide commands in M-x which do not work in the current mode.
+      ;; Vertico commands are hidden in normal buffers.
+      ;; (setq read-extended-command-predicate
+      ;;       #'command-completion-default-include-p)
+
+      ;; Enable recursive minibuffers
+      (setq enable-recursive-minibuffers t))
+
+  ;; Optionally use the `orderless' completion style.
+  (use-package orderless
+    :ensure t
+    :init
+    (setq completion-styles '(orderless basic)
+	  completion-category-defaults nil
+	  completion-category-overrides '((file (styles partial-completion)))))
+#+end_src
+
+#+RESULTS:
+
+** marginalia
+#+begin_src emacs-lisp
+  ;; Enable rich annotations using the Marginalia package
+  (use-package marginalia
+    :ensure t
+    ;; Bind `marginalia-cycle' locally in the minibuffer.  To make the binding
+    ;; available in the *Completions* buffer, add it to the
+    ;; `completion-list-mode-map'.
+    :bind (:map minibuffer-local-map
+	   ("M-A" . marginalia-cycle))
+
+    ;; The :init section is always executed.
+    :init
+
+    ;; Marginalia must be activated in the :init section of use-package such that
+    ;; the mode gets enabled right away. Note that this forces loading the
+    ;; package.
+    (marginalia-mode))
+
+#+end_src
+
+#+RESULTS:
+: marginalia-cycle
+
+
 ** projectile
    projectile setup.
-
+   
    #+BEGIN_SRC emacs-lisp
-     (use-package projectile
-       :ensure t
-       :config
-       (projectile-global-mode)
-       (setq projectile-completion-system 'ivy))
+  (use-package projectile
+    :ensure t
+    :config
+    (projectile-global-mode)
 
-     (use-package counsel-projectile
-       :ensure t
-       :config
-       (counsel-projectile-mode))
+  (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+  )
 
-     (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+  (use-package consult-projectile
+    :ensure t
+    :init)
    #+END_SRC
+
+   #+RESULTS:
+
 ** yassnippet
 
 #+BEGIN_SRC emacs-lisp
@@ -306,145 +389,32 @@
    #+RESULTS:
    : t
 
-** centaur
-#+begin_src emacs-lisp :tangle no
-  (use-package all-the-icons
-    :ensure t
-    )
-
-  (use-package centaur-tabs
-    :ensure t
-    :init
-    (setq centaur-tabs-enable-key-bindings t)
-    :config
-    (setq centaur-tabs-style "bar"
-	  centaur-tabs-height 32
-	  centaur-tabs-set-icons t
-	  centaur-tabs-show-new-tab-button t
-	  centaur-tabs-set-modified-marker t
-	  centaur-tabs-set-bar 'under
-	  centaur-tabs-show-count nil
-	  x-underline-at-descent-line t
-	  centaur-tabs-left-edge-margin nil)
-    (centaur-tabs-change-fonts (face-attribute 'default :font) 110)
-    (centaur-tabs-headline-match)
-    ;; (centaur-tabs-enable-buffer-alphabetical-reordering)
-    ;; (setq centaur-tabs-adjust-buffer-order t)
-    (centaur-tabs-mode t)
-    (setq uniquify-separator "/")
-    (setq uniquify-buffer-name-style 'forward)
-    (defun centaur-tabs-buffer-groups ()
-      (list
-       (cond
-	((or (string-equal "*" (substring (buffer-name) 0 1))
-	     (memq major-mode '(magit-process-mode
-				magit-status-mode
-				magit-diff-mode
-				magit-log-mode
-				magit-file-mode
-				magit-blob-mode
-				magit-blame-mode
-				)))
-	 "Emacs")
-	((derived-mode-p 'prog-mode)
-	 "Editing")
-	((derived-mode-p 'dired-mode)
-	 "Dired")
-	((memq major-mode '(helpful-mode
-			    help-mode))
-	 "Help")
-	((memq major-mode '(org-mode
-			    org-agenda-clockreport-mode
-			    org-src-mode
-			    org-agenda-mode
-			    org-beamer-mode
-			    org-indent-mode
-			    org-bullets-mode
-			    org-cdlatex-mode
-			    org-agenda-log-mode
-			    diary-mode))
-	 "OrgMode")
-	(t
-	 (centaur-tabs-get-group-name (current-buffer))))))
-    :hook
-    (dashboard-mode . centaur-tabs-local-mode)
-    (calendar-mode . centaur-tabs-local-mode)
-    (org-agenda-mode . centaur-tabs-local-mode)
-    :bind
-    ("C-x t o" . centaur-tabs-ace-jump)
-    )
-#+end_src
-
-#+RESULTS:
-: centaur-tabs-ace-jump
-
 * Various Language Environment Setups
-** Mac OS X Configuration
-#+begin_src emacs-lisp
-  (use-package exec-path-from-shell
-    :ensure t
-    :init
-    (when (memq window-system '(mac ns x))
-      (exec-path-from-shell-initialize))
-    )
-#+end_src
-
-#+RESULTS:
-: ((MANPATH . /Users/rjohn/.nvm/versions/node/v16.10.0/share/man:/opt/homebrew/share/man::) (PATH . /opt/homebrew/opt/openssl@3/bin:/Users/rjohn/.pyenv/shims:/Users/rjohn/.nvm/versions/node/v16.10.0/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/rjohn/.local/bin:/Users/rjohn/.local/bin))
 ** [elpy] New Python Setup
-#+BEGIN_SRC emacs-lisp
-  (use-package elpy
-    :ensure t
-    :init
-    (elpy-enable))
+#+begin_src emacs-lisp
+    (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t)
 
-  (add-hook 'elpy-mode-hook (lambda ()
-			      (add-hook 'before-save-hook
-					'elpy-black-fix-code nil t)))
+    (setq package-selected-packages '(lsp-mode flycheck company))
 
-  (when (load "flycheck" t t)
-    (setq elpy-modules (delq 'elpy-module-flymake elpy-modules))
-    (add-hook 'elpy-mode-hook 'flycheck-mode))
+    (when (cl-find-if-not #'package-installed-p package-selected-packages)
+      (package-refresh-contents)
+      (mapc #'package-install package-selected-packages))
 
-  (setq python-flymake-command '("/Users/rjohn/.pyenv/shims/flake8" "--config=/Users/rjohn/flake8.ini" "-"))  
-  (setq python-check-command "/Users/rjohn/.pyenv/shims/flake8 --config=/Users/rjohn/flake8.ini")
-  (setq elpy-syntax-check-command python-check-command)
+    (setq gc-cons-threshold (* 100 1024 1024)
+	  read-process-output-max (* 1024 1024)
+	  company-idle-delay 0.0
+	  company-minimum-prefix-length 1
+	  lsp-idle-delay 0.1)
 
-  (setq flycheck-flake8rc "/Users/rjohn/flake8.ini")
-
-  (defun company-yasnippet-or-completion ()
-    "Solve company yasnippet conflicts."
-    (interactive)
-    (let ((yas-fallback-behavior
-	   (apply 'company-complete-common nil)))
-      (yas-expand)))
-
-  (add-hook 'company-mode-hook
-	    (lambda ()
-	      (substitute-key-definition
-	       'company-complete-common
-	       'company-yasnippet-or-completion
-	       company-active-map)))
-
-  (setq elpy-rpc-ignored-buffer-size 102400000)
-
-  (setq flycheck-checker-error-threhold 10000)
-
-#+END_SRC
+    (use-package lsp-pyright
+      :ensure t
+      :hook (python-mode . (lambda ()
+			      (require 'lsp-pyright)
+			      (lsp))))  ; or lsp-deferred
+#+end_src
 
 #+RESULTS:
-: 10000
-
-#+begin_src emacs-lisp :tangle no
-    (use-package importmagic
-	:ensure t
-	:config
-	(add-hook 'python-mode-hook 'importmagic-mode))
-
-    (define-key importmagic-mode-map (kbd "C-c C-l") 'importmagic-fix-symbol-at-point)
-    ; (setq importmagic-be-quiet t)
-    ; (add-to-list 'ivy-ignore-buffers "\\*epc con")
-#+end_src
+| yasnippet-snippets--fixed-indent | er/add-python-mode-expansions | (lambda nil (require 'lsp-pyright) (lsp)) | rainbow-delimiters-mode |
 
 * org-mode setup
 ** org-modern
@@ -477,22 +447,22 @@
      (global-set-key (kbd "C-c c") 'org-capture)
 
      (setq org-capture-templates
-	   '(("n" "Note" entry (file+headline "~/org/src/orgfiles/notes.org" "Notes")
+	   '(("n" "Note" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Notes")
 	      "* %?\n%T\n%F\n\n%i")
-	     ("m" "Meeting Note" entry (file+olp+datetree "~/org/src/orgfiles/notes.org" "Meeting Notes")
+	     ("m" "Meeting Note" entry (file+olp+datetree "~/Dropbox/src/orgfiles/notes.org" "Meeting Notes")
 	      "* %?\n\n")
-	     ("l" "Link" entry (file+headline "~/org/src/orgfiles/notes.org" "Links")
+	     ("l" "Link" entry (file+headline "~/Dropbox/src/orgfiles/notes.org" "Links")
 	      "* %? %^L \n%T")
-	     ("t" "To Do Item" entry (file+headline "~/org/src/orgfiles/i.org" "To Do Items")
+	     ("t" "To Do Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "To Do Items")
 	      "* TODO %?\n %i\n\n" :prepend t)
-	     ("d" "Deadline Item" entry (file+headline "~/org/src/orgfiles/i.org" "Deadlines")
+	     ("d" "Deadline Item" entry (file+headline "~/Dropbox/src/orgfiles/i.org" "Deadlines")
 	      "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
-	     ("j" "Journal" entry (file+datetree "~/org/src/orgfiles/journal.org")
+	     ("j" "Journal" entry (file+datetree "~/Dropbox/src/orgfiles/journal.org")
 	      "* %?\nEntered on %U\n  %i\n  %a\n\n")))
    #+END_SRC
 
    #+RESULTS:
-   | n | Note | entry | (file+headline ~/org/src/orgfiles/notes.org Notes) | * %? |
+   | n | Note | entry | (file+headline ~/Dropbox/src/orgfiles/notes.org Notes) | * %? |
 
 ** org-gcal
    org-gcal config.
@@ -507,7 +477,7 @@
        :config
        (setq org-gcal-client-id "CLIENT ID"
 	     org-gcal-client-secret "SECRET"
-	     org-gcal-file-alist '(("johnrod.john@gmail.com" . "~/org/src/orgfiles/cal.org"))))
+	     org-gcal-file-alist '(("johnrod.john@gmail.com" . "~/Dropbox/src/orgfiles/cal.org"))))
 
    #+END_SRC
 
@@ -517,7 +487,23 @@
 ** org-agenda
    org-agenda
 
-#+begin_src emacs-lisp :tangle no
+   #+BEGIN_SRC emacs-lisp
+  (setq org-agenda-files (list "~/Dropbox/src/orgfiles/notes.org"
+			       "~/Dropbox/src/orgfiles/journal.org"			     
+			       "~/Dropbox/src/orgfiles/i.org"))
+
+  (global-set-key (kbd "C-c a") 'org-agenda)
+
+  (setq org-agenda-custom-commands
+	'(("c" "Simple agenda view"
+	   ((agenda "")
+	    (alltodo "")))))
+   #+END_SRC
+
+#+RESULTS:
+| c | Simple agenda view | ((agenda ) (alltodo )) |
+
+#+begin_src emacs-lisp
   (use-package org-super-agenda
     :ensure t
     :config
@@ -529,35 +515,5 @@
       (org-agenda-list))
 #+end_src
 
-   #+BEGIN_SRC emacs-lisp
-  (setq org-agenda-files (list "~/org/src/orgfiles/notes.org"
-			       "~/org/src/orgfiles/journal.org"			     
-			       "~/org/src/orgfiles/i.org"))
+#+RESULTS:
 
-  (global-set-key (kbd "C-c a") 'org-agenda)
-
-  (setq org-agenda-custom-commands
-	'(("c" "Simple agenda view"
-	   ((agenda "")
-	    (alltodo "")))))
-   #+END_SRC
-
-   #+RESULTS:
-   | c | Simple agenda view | ((agenda ) (alltodo )) |
-
-* Shortcuts to remember
-  - C-( starts a macro
-  - C-) stops a macro
-  - C-e runs a macro
-  - C-, C-. C-? for python documentation
-  - C-x u for undo tree
-  - <s-TAB
-  - C-q expand-region thing
-  - M-q iedit mode
-  - C-x n narrow-widen-dwim
-  - C-c C-e w surrounds marked area in html tag
-  - C-c C-f folds html   
-
-
-   
-   
