@@ -389,8 +389,8 @@
    #+RESULTS:
    : t
 
-* Various Language Environment Setups
-** [elpy] New Python Setup
+* IDE Setup
+** lsp-mode
 #+begin_src emacs-lisp
     (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t)
 
