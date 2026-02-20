@@ -1,0 +1,9 @@
+links:
+  - src: config/emacs/init.el
+    dst: ~/.emacs.d/init.el
+  - src: config/emacs/init.org
+    dst: ~/config/emacs/init.org
+  - src: config/zsh/.zshrc
+    dst: ~/.zshrc
+  - src: config/tmux/.tmux.conf
+    dst: ~/.tmux.conf
