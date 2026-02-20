@@ -48,5 +48,3 @@ and a few other oh-my-zsh specifics.
 The tmux configuration is stored in a `.tmux.conf` file.
 
 At present, this configures key bindings and the powerline theme.
-
-Sample change
