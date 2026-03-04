@@ -12,6 +12,9 @@ else
   export EDITOR='emacs'
 fi
 
+# important for emacs
+export PATH=/usr/local/bin:$PATH
+
 # pyenv setup
 export PATH="$HOME/.pyenv/bin:$PATH"
 eval "$(pyenv init -)"
