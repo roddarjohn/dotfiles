@@ -19,17 +19,14 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
-   '(casual-suite mu4e-views mu4e zenburn-theme yasnippet-snippets
-		  which-key vertico typescript-mode tsi
-		  tree-sitter-langs terraform-mode solarized-theme
-		  rainbow-delimiters quelpa-use-package pyenv-mode
-		  org-super-agenda org-modern orderless marginalia
-		  magit lsp-pyright iedit hungry-delete
-		  hc-zenburn-theme flycheck flatland-theme
-		  expand-region exec-path-from-shell embark-consult
-		  devdocs corfu consult-projectile company casual cape
-		  beacon anti-zenburn-theme all-the-icons-ibuffer
-		  ace-window))
+   '(ace-window all-the-icons-ibuffer apheleia beacon cape casual-suite
+		company consult-projectile devdocs embark-consult
+		expand-region flatland-theme flycheck-ledger
+		hungry-delete iedit ledger-mode lsp-pyright magit
+		marginalia orderless org-modern org-super-agenda
+		pyenv-mode quelpa-use-package rainbow-delimiters
+		terraform-mode transient tree-sitter-langs tsi
+		typescript-mode vertico which-key yasnippet-snippets))
  '(warning-suppress-log-types '((defvaralias losing-value git-commit-mode-hook))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
