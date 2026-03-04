@@ -20,13 +20,14 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    '(ace-window all-the-icons-ibuffer apheleia beacon cape casual-suite
-		company consult-projectile devdocs embark-consult
-		expand-region flatland-theme flycheck-ledger
-		hungry-delete iedit ledger-mode lsp-pyright magit
-		marginalia orderless org-modern org-super-agenda
-		pyenv-mode quelpa-use-package rainbow-delimiters
-		terraform-mode transient tree-sitter-langs tsi
-		typescript-mode vertico which-key yasnippet-snippets))
+		company consult-projectile corfu devdocs
+		embark-consult expand-region flatland-theme
+		flycheck-ledger hungry-delete iedit ledger-mode
+		lsp-pyright magit marginalia orderless org-modern
+		org-super-agenda pyenv-mode quelpa-use-package
+		rainbow-delimiters terraform-mode transient
+		tree-sitter-langs tsi typescript-mode vertico
+		which-key yasnippet-snippets))
  '(warning-suppress-log-types '((defvaralias losing-value git-commit-mode-hook))))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.

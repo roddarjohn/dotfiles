@@ -16,10 +16,7 @@
 
 * Package manager
 ** straight
-- this is not currently used
-  ... but could be if straight is required for something
-
-#+begin_src emacs-lisp :tangle no
+#+begin_src emacs-lisp
   (defvar bootstrap-version)
   (let ((bootstrap-file
 	 (expand-file-name
@@ -35,6 +32,11 @@
 	(goto-char (point-max))
 	(eval-print-last-sexp)))
     (load bootstrap-file nil 'nomessage))
+#+end_src
+
+** load-path
+#+begin_src emacs-lisp
+  (add-to-list 'load-path "~/.emacs.d/lisp/")
 #+end_src
 
 * Base setup
@@ -177,7 +179,7 @@ go to the next page, previous page, or enable docstrings.
 ** corfu
 - need to fix whack popup issue
 
-#+begin_src emacs-lisp :tangle no
+#+begin_src emacs-lisp
   (use-package corfu
     ;; Optional customizations
     ;; :custom
@@ -195,45 +197,33 @@ go to the next page, previous page, or enable docstrings.
 
     :ensure t
 
-    ;; :custom
-    ;; Enable auto completion, configure delay, trigger and quitting
-    ;;(setq corfu-auto t
-    ;;	  corfu-auto-delay 0.2
-    ;;	  corfu-auto-trigger "." ;; Custom trigger characters
-    ;;	  corfu-quit-no-match 'separator) ;; or t  
-
     :init
-    ;; Recommended: Enable Corfu globally.  Recommended since many modes provide
-    ;; Capfs and Dabbrev can be used globally (M-/).  See also the customization
-    ;; variable `global-corfu-modes' to exclude certain modes.
-    (global-corfu-mode)
+    (setq corfu-auto t
+    	  corfu-auto-delay 0.2
+    	  corfu-auto-trigger "." ;; Custom trigger characters
+    	  corfu-quit-no-match 'separator
+  	corfu-max-width 80) ;; or t  
 
-    ;; Enable optional extension modes:
-    ;; (corfu-history-mode)
-    ;; (corfu-popupinfo-mode)
-    )
+    (global-corfu-mode))
 
   ;; A few more useful configurations...
   (use-package emacs
     :custom
-    ;; TAB cycle if there are only few candidates
-    ;; (completion-cycle-threshold 3)
-
-    ;; Enable indentation+completion using the TAB key.
-    ;; `completion-at-point' is often bound to M-TAB.
+    (completion-cycle-threshold 3)
     (tab-always-indent 'complete)
-
-    ;; Emacs 30 and newer: Disable Ispell completion function.
-    ;; Try `cape-dict' as an alternative.
     (text-mode-ispell-word-completion nil)
-
-    ;; Hide commands in M-x which do not apply to the current mode.  Corfu
-    ;; commands are hidden, since they are not used via M-x. This setting is
-    ;; useful beyond Corfu.
     (read-extended-command-predicate #'command-completion-default-include-p))
+
+  (with-eval-after-load 'corfu
+    (setq corfu-terminal-disable-on-gui nil)
+    (require 'popon)
+    (require 'corfu-terminal)
+    (corfu-terminal-mode +1))
 #+end_src
 
 #+RESULTS:
+: t
+
 ** cape
 - figure this one out a little more
 #+begin_src emacs-lisp

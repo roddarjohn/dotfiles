@@ -7,3 +7,7 @@ links:
     dst: ~/.zshrc
   - src: config/tmux/.tmux.conf
     dst: ~/.tmux.conf
+  - src: config/emacs/lisp/corfu-terminal.el
+    dst: ~/.emacs.d/lisp/corfu-terminal.el
+  - src: config/emacs/lisp/popon.el
+    dst: ~/.emacs.d/lisp/popon.el
