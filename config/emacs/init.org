@@ -61,6 +61,7 @@
   (tool-bar-mode -1)
   (scroll-bar-mode -1)
 #+end_src
+
 ** nuke-trailing-whitespace
 
 #+begin_src emacs-lisp
@@ -709,10 +710,23 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-		 '(python-mode . ("ty" "server"))))
+  		 '(python-mode . ("ty" "server"))))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
+
+  (setq-default eglot-workspace-configuration
+  	      '((:ty . (
+  			 :inlayHints
+  			 (
+  			  :variableTypes :json-false
+  					 :callArgumentNames :json-false
+  					 )))))
+  					 
+  					  
 #+end_src
+
+#+RESULTS:
+| :ty | :inlayHints | (:variableTypes :json-false :callArgumentNames :json-false) |
 
 * org-mode setup
 ** org-capture setup
