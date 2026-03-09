@@ -11,12 +11,13 @@ working on projects, so it may be out of date.
 
 # Getting started
 
-To install, please run `sh bin/install.sh`.
+You will need `stow`, `tmux`, `zsh`, `oh-my-zsh`, and `emacs` installed.
 
-You will need `tmux`, `zsh`, `oh-my-zsh`, and `emacs` installed.
+To install, run:
 
-In the event you change a configuration file and wish to save it back,
-please run `sh bin/sync_repository.sh`.
+```sh
+git clone https://github.com/roddarjohn/dotfiles.git ~/dotfiles && ~/dotfiles/install.sh
+```
 
 # Emacs
 
