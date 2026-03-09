@@ -14,6 +14,8 @@ fi
 
 # important for emacs
 export PATH=/usr/local/bin:$PATH
+# important for claude
+export PATH="$HOME/.local/bin:$PATH"
 
 # pyenv setup
 export PATH="$HOME/.pyenv/bin:$PATH"
