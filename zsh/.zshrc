@@ -3,7 +3,7 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="bira"
 plugins=(git)
 
-source $ZSH/oh-my-zsh.sh
+source $ZSH/oh-my-zsh.sh  # intentionally fails if not found
 
 # if on ssh, use emacs -nw; if not, use emacs
 if [[ -n $SSH_CONNECTION ]]; then
@@ -19,13 +19,21 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # pyenv setup
 export PATH="$HOME/.pyenv/bin:$PATH"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
+if command -v pyenv &>/dev/null; then
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+else
+  echo "zshrc: pyenv not found, skipping"
+fi
 
 # nvm setup
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+if [ -d "$NVM_DIR" ]; then
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+else
+  echo "zshrc: nvm not found, skipping"
+fi
 
 # For uv
-source $HOME/.local/bin/env
+[ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
