@@ -710,7 +710,7 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  		 '(python-mode . ("ty" "server"))))
+  		 '(python-mode . ("uvx" "--with ty" "ty" "server"))))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
 
