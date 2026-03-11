@@ -661,6 +661,15 @@ I don't fully use this right now. Perhaps I should.
 #+RESULTS:
 : t
 
+** exec-path-from-shell
+#+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :ensure t
+    :config
+    (setq exec-path-from-shell-shell-name "/bin/zsh")
+    (exec-path-from-shell-initialize))
+#+end_src
+
 * mu4e
 ** root setup
 #+begin_src emacs-lisp
@@ -706,12 +715,65 @@ I don't fully use this right now. Perhaps I should.
   (setq mu4e-confirm-quit nil)
 #+end_src
 
+* Python
+** ruff on save
+#+begin_src emacs-lisp
+  (defun ruff-format-buffer ()
+    (interactive)
+    (let* ((filename (or (buffer-file-name) "buffer.py"))
+           (out-buf (generate-new-buffer " *ruff-output*"))
+           (exit-code (call-process-region
+                       (point-min) (point-max)
+                       "ruff" nil out-buf nil
+                       "format" "--stdin-filename" filename "-")))
+      (if (zerop exit-code)
+          (let ((new-content (with-current-buffer out-buf (buffer-string))))
+            (unless (string= new-content (buffer-substring-no-properties (point-min) (point-max)))
+              (let ((pos (point)))
+                (erase-buffer)
+                (insert new-content)
+                (goto-char pos))))
+        (message "ruff format: failed with exit code %d" exit-code))
+      (kill-buffer out-buf)))
+
+  (defun ruff-fix-buffer ()
+    (interactive)
+    (let* ((filename (or (buffer-file-name) "buffer.py"))
+           (out-buf (generate-new-buffer " *ruff-output*"))
+           (exit-code (call-process-region
+                       (point-min) (point-max)
+                       "ruff" nil out-buf nil
+                       "check" "--fix" "--stdin-filename" filename "-")))
+      (if (zerop exit-code)
+          (let ((new-content (with-current-buffer out-buf (buffer-string))))
+            (unless (string= new-content (buffer-substring-no-properties (point-min) (point-max)))
+              (let ((pos (point)))
+                (erase-buffer)
+                (insert new-content)
+                (goto-char pos))))
+        (message "ruff fix: failed with exit code %d" exit-code))
+      (kill-buffer out-buf)))
+
+  (defun ruff-on-save ()
+    (ruff-fix-buffer)
+    (ruff-format-buffer))
+
+  (defun ruff-enable-on-save ()
+    (add-hook 'before-save-hook #'ruff-on-save nil t))
+
+  (add-hook 'python-mode-hook #'ruff-enable-on-save)
+  (add-hook 'python-ts-mode-hook #'ruff-enable-on-save)
+#+end_src
+
+#+RESULTS:
+| ruff-enable-on-save |
+
 * eglot setup
 ** eglot
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  		 '(python-mode . ("uvx" "--with ty" "ty" "server"))))
+  		 '(python-mode . ("uvx" "--with" "ty" "ty" "server"))))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
 
@@ -728,6 +790,25 @@ I don't fully use this right now. Perhaps I should.
 
 #+RESULTS:
 | :ty | :inlayHints | (:variableTypes :json-false :callArgumentNames :json-false) |
+** copilot
+#+begin_src emacs-lisp
+  (use-package copilot
+    :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
+    :config
+    (global-copilot-mode)
+
+    (keymap-set copilot-completion-map "<right>" #'copilot-accept-completion)
+    (keymap-set copilot-completion-map "C-f" #'copilot-accept-completion)
+    (keymap-set copilot-completion-map "M-<right>" #'copilot-accept-completion-by-word)
+    (keymap-set copilot-completion-map "M-f" #'copilot-accept-completion-by-word)
+    (keymap-set copilot-completion-map "C-e" #'copilot-accept-completion-by-line)
+    (keymap-set copilot-completion-map "<end>" #'copilot-accept-completion-by-line)
+    (keymap-set copilot-completion-map "M-n" #'copilot-next-completion)
+    (keymap-set copilot-completion-map "M-p" #'copilot-previous-completion)
+    :ensure t)
+#+end_src
+
+#+RESULTS:
 
 * org-mode setup
 ** org-capture setup
