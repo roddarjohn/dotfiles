@@ -482,6 +482,12 @@ Project management in emacs
    #+RESULTS:
    : t
 
+** magit-forge
+#+begin_src emacs-lisp
+  (use-package forge
+    :ensure t
+    :after magit)
+#+end_src
 ** ibuffer
 - on first installation you'll need to run all-the-icons-install-fonts
 
