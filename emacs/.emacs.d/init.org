@@ -1,4 +1,5 @@
 #+STARTUP: overview
+#+PROPERTY: header-args:emacs-lisp :tangle emacs-config.el
 
 * Notes
 - mu4e?
@@ -752,3 +753,4 @@ I don't fully use this right now. Perhaps I should.
 
    #+RESULTS:
    | n | Note | entry | (file+headline ~/org/src/orgfiles/notes.org Notes) | * %? |
+
