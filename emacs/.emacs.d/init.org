@@ -212,7 +212,7 @@ go to the next page, previous page, or enable docstrings.
   (use-package emacs
     :custom
     (completion-cycle-threshold 3)
-    (tab-always-indent 'complete)
+    (tab-always-indent t)
     (text-mode-ispell-word-completion nil)
     (read-extended-command-predicate #'command-completion-default-include-p))
 
@@ -653,7 +653,7 @@ I don't fully use this right now. Perhaps I should.
     (keymap-set reb-lisp-mode-map "C-o" #'casual-re-builder-tmenu)
     (keymap-set bookmark-bmenu-mode-map "C-o" #'casual-bookmarks-tmenu)
     (keymap-set org-agenda-mode-map "C-o" #'casual-agenda-tmenu)
-    (keymap-global-set "M-g" #'casual-avy-tmenu)
+    ;; (keymap-global-set "M-g" #'casual-avy-tmenu)
     (keymap-set symbol-overlay-map "C-o" #'casual-symbol-overlay-tmenu)
     (keymap-global-set "C-o" #'casual-editkit-main-tmenu))
 #+end_src
@@ -728,7 +728,8 @@ I don't fully use this right now. Perhaps I should.
                        "format" "--stdin-filename" filename "-")))
       (if (zerop exit-code)
           (let ((new-content (with-current-buffer out-buf (buffer-string))))
-            (unless (string= new-content (buffer-substring-no-properties (point-min) (point-max)))
+            (if (string= new-content (buffer-substring-no-properties (point-min) (point-max)))
+                (message "All checks passed")
               (let ((pos (point)))
                 (erase-buffer)
                 (insert new-content)
@@ -738,21 +739,23 @@ I don't fully use this right now. Perhaps I should.
 
   (defun ruff-fix-buffer ()
     (interactive)
-    (let* ((filename (or (buffer-file-name) "buffer.py"))
-           (out-buf (generate-new-buffer " *ruff-output*"))
-           (exit-code (call-process-region
-                       (point-min) (point-max)
-                       "ruff" nil out-buf nil
-                       "check" "--fix" "--stdin-filename" filename "-")))
-      (if (zerop exit-code)
-          (let ((new-content (with-current-buffer out-buf (buffer-string))))
-            (unless (string= new-content (buffer-substring-no-properties (point-min) (point-max)))
-              (let ((pos (point)))
-                (erase-buffer)
-                (insert new-content)
-                (goto-char pos))))
-        (message "ruff fix: failed with exit code %d" exit-code))
-      (kill-buffer out-buf)))
+    (let* ((original (buffer-substring-no-properties (point-min) (point-max)))
+           (tmp-file (make-temp-file "ruff-fix-" nil ".py")))
+      (write-region (point-min) (point-max) tmp-file nil 'silent)
+      (let ((exit-code (call-process "ruff" nil nil nil
+                                     "check" "--fix" tmp-file)))
+        (if (zerop exit-code)
+            (let ((new-content (with-temp-buffer
+                                 (insert-file-contents tmp-file)
+                                 (buffer-string))))
+              (if (string= new-content original)
+                  (message "All checks passed")
+                (let ((pos (point)))
+                  (erase-buffer)
+                  (insert new-content)
+                  (goto-char pos))))
+          (message "ruff fix: failed with exit code %d" exit-code)))
+      (delete-file tmp-file)))
 
   (defun ruff-on-save ()
     (ruff-fix-buffer)
@@ -773,7 +776,8 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  		 '(python-mode . ("uvx" "--with" "ty" "ty" "server"))))
+  		 '(python-mode . ("uvx" "--with" "ty" "ty" "server")))
+    (keymap-set eglot-mode-map "C-c j" #'eglot-code-actions))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
 
@@ -792,19 +796,17 @@ I don't fully use this right now. Perhaps I should.
 | :ty | :inlayHints | (:variableTypes :json-false :callArgumentNames :json-false) |
 ** copilot
 #+begin_src emacs-lisp
-(use-package copilot
-  :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
-  :ensure t  ;; move :ensure before :config
-  :hook (prog-mode . copilot-mode)  ;; use hook instead of global-copilot-mode
-  :config
-  (keymap-set copilot-completion-map "<right>" #'copilot-accept-completion)
-  (keymap-set copilot-completion-map "C-f" #'copilot-accept-completion)
-  (keymap-set copilot-completion-map "M-<right>" #'copilot-accept-completion-by-word)
-  (keymap-set copilot-completion-map "M-f" #'copilot-accept-completion-by-word)
-  (keymap-set copilot-completion-map "C-e" #'copilot-accept-completion-by-line)
-  (keymap-set copilot-completion-map "<end>" #'copilot-accept-completion-by-line)
-  (keymap-set copilot-completion-map "M-n" #'copilot-next-completion)
-  (keymap-set copilot-completion-map "M-p" #'copilot-previous-completion))
+  (use-package copilot
+    :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
+    :ensure t
+    :hook (prog-mode . copilot-mode)
+    :bind (:map copilot-completion-map
+                ("<tab>" . copilot-accept-completion)
+                ("TAB" . copilot-accept-completion)
+                ("C-<tab>" . copilot-accept-completion-by-word)
+                ("C-TAB" . copilot-accept-completion-by-word)
+                ("C-n" . copilot-next-completion)
+                ("C-p" . copilot-previous-completion)))  
 #+end_src
 
 #+RESULTS:
