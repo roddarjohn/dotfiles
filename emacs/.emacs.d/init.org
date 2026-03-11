@@ -792,20 +792,19 @@ I don't fully use this right now. Perhaps I should.
 | :ty | :inlayHints | (:variableTypes :json-false :callArgumentNames :json-false) |
 ** copilot
 #+begin_src emacs-lisp
-  (use-package copilot
-    :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
-    :config
-    (global-copilot-mode)
-
-    (keymap-set copilot-completion-map "<right>" #'copilot-accept-completion)
-    (keymap-set copilot-completion-map "C-f" #'copilot-accept-completion)
-    (keymap-set copilot-completion-map "M-<right>" #'copilot-accept-completion-by-word)
-    (keymap-set copilot-completion-map "M-f" #'copilot-accept-completion-by-word)
-    (keymap-set copilot-completion-map "C-e" #'copilot-accept-completion-by-line)
-    (keymap-set copilot-completion-map "<end>" #'copilot-accept-completion-by-line)
-    (keymap-set copilot-completion-map "M-n" #'copilot-next-completion)
-    (keymap-set copilot-completion-map "M-p" #'copilot-previous-completion)
-    :ensure t)
+(use-package copilot
+  :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
+  :ensure t  ;; move :ensure before :config
+  :hook (prog-mode . copilot-mode)  ;; use hook instead of global-copilot-mode
+  :config
+  (keymap-set copilot-completion-map "<right>" #'copilot-accept-completion)
+  (keymap-set copilot-completion-map "C-f" #'copilot-accept-completion)
+  (keymap-set copilot-completion-map "M-<right>" #'copilot-accept-completion-by-word)
+  (keymap-set copilot-completion-map "M-f" #'copilot-accept-completion-by-word)
+  (keymap-set copilot-completion-map "C-e" #'copilot-accept-completion-by-line)
+  (keymap-set copilot-completion-map "<end>" #'copilot-accept-completion-by-line)
+  (keymap-set copilot-completion-map "M-n" #'copilot-next-completion)
+  (keymap-set copilot-completion-map "M-p" #'copilot-previous-completion))
 #+end_src
 
 #+RESULTS:
