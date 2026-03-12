@@ -33,6 +33,8 @@
 	(goto-char (point-max))
 	(eval-print-last-sexp)))
     (load bootstrap-file nil 'nomessage))
+
+  (setq straight-use-package-by-default t)
 #+end_src
 
 ** load-path

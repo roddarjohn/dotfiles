@@ -18,6 +18,14 @@ find "$HOME" -maxdepth 4 -type l 2>/dev/null | while read -r link; do
     esac
 done
 
+# Wipe and recreate target directories before stowing.
+# If a target directory doesn't exist, stow replaces it with a single symlink
+# (e.g. ~/.emacs.d -> dotfiles/emacs/.emacs.d), causing Emacs runtime data
+# (elpa/, straight/, history, etc.) to land inside the dotfiles repo.
+# A pre-existing real directory forces stow to symlink individual files instead.
+rm -rf "$HOME/.emacs.d"
+mkdir -p "$HOME/.emacs.d"
+
 for pkg in zsh tmux emacs; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
