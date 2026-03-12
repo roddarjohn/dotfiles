@@ -36,6 +36,10 @@
 #+end_src
 
 ** load-path
+This is really not used anymore, but could be if I want to include
+specific lisp code. Just put the code in the dotfiles repo and then
+it'd be tracked.
+
 #+begin_src emacs-lisp
   (add-to-list 'load-path "~/.emacs.d/lisp/")
 #+end_src
@@ -215,12 +219,6 @@ go to the next page, previous page, or enable docstrings.
     (tab-always-indent t)
     (text-mode-ispell-word-completion nil)
     (read-extended-command-predicate #'command-completion-default-include-p))
-
-  (with-eval-after-load 'corfu
-    (setq corfu-terminal-disable-on-gui nil)
-    (require 'popon)
-    (require 'corfu-terminal)
-    (corfu-terminal-mode +1))
 #+end_src
 
 #+RESULTS:
@@ -483,7 +481,7 @@ Project management in emacs
    : t
 
 ** magit-forge
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle no
   (use-package forge
     :ensure t
     :after magit)
@@ -810,9 +808,7 @@ I don't fully use this right now. Perhaps I should.
                 ("<tab>" . copilot-accept-completion)
                 ("TAB" . copilot-accept-completion)
                 ("C-<tab>" . copilot-accept-completion-by-word)
-                ("C-TAB" . copilot-accept-completion-by-word)
-                ("C-n" . copilot-next-completion)
-                ("C-p" . copilot-previous-completion)))  
+                ("C-TAB" . copilot-accept-completion-by-word)))
 #+end_src
 
 #+RESULTS:

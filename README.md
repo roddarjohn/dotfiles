@@ -37,6 +37,33 @@ This makes use literate programming
 I change my configuration from time to time, and try to not include
 portions I don't currently use.
 
+## Installing emacs
+
+Due to issues with emacs on COSMIC, I usually install emacs from src.
+
+The key is `--with-pgtk`
+
+```sh
+cd /opt/
+sudo mkdir emacs
+sudo chown $USER:$USER emacs/
+git clone git@github.com:emacs-mirror/emacs.git --single-branch --branch emacs-30
+cd emacs/
+
+./autogen.sh
+./configure --with-tree-sitter --with-pgtk
+
+# find out the number of processors to use in the next command
+nproc
+
+make bootstrap -j4
+
+# quick test before install
+src/emacs -Q
+
+sudo make install
+```
+
 # ZSH
 
 The zsh configuration is defined in a `.zshrc` file.
