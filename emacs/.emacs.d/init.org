@@ -160,12 +160,13 @@ go to the next page, previous page, or enable docstrings.
 - [[https://github.com/Fanael/rainbow-delimiters][rainbow delimeters]]
 
   #+begin_src emacs-lisp
-  (use-package rainbow-delimiters
-    :ensure t
-    :config
-    (add-hook 'python-mode-hook 'rainbow-delimiters-mode)
-    (add-hook 'emacs-lisp-mode 'rainbow-delimiters-mode)
-    (add-hook 'lisp-mode 'rainbow-delimiters-mode))
+    (use-package rainbow-delimiters
+      :ensure t
+      :config
+      (add-hook 'python-mode-hook 'rainbow-delimiters-mode)
+      (add-hook 'python-ts-mode-hook 'rainbow-delimiters-mode)      
+      (add-hook 'emacs-lisp-mode 'rainbow-delimiters-mode)
+      (add-hook 'lisp-mode 'rainbow-delimiters-mode))
    #+end_src
 
 ** ace-window
@@ -775,15 +776,21 @@ I don't fully use this right now. Perhaps I should.
 #+RESULTS:
 | ruff-enable-on-save |
 
+* tree-sitter
+#+begin_src emacs-lisp
+  (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
+#+end_src
+
 * eglot setup
 ** eglot
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  		 '(python-mode . ("uvx" "--with" "ty" "ty" "server")))
+  	         '((python-mode python-ts-mode) . ("uvx" "--with" "ty" "ty" "server")))
     (keymap-set eglot-mode-map "C-c j" #'eglot-code-actions))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
+  (add-hook 'python-ts-mode-hook 'eglot-ensure)  
 
   (setq-default eglot-workspace-configuration
   	      '((:ty . (
