@@ -56,7 +56,7 @@ cd emacs/
 # find out the number of processors to use in the next command
 nproc
 
-make bootstrap -j4
+make bootstrap -j<number of processors>
 
 # quick test before install
 src/emacs -Q
