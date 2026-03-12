@@ -44,7 +44,7 @@ So..... due to ABI grammar issues, I often need to install tree-sitter from sour
 ```sh
 git clone https://github.com/tree-sitter/tree-sitter.git
 cd tree-sitter
-git checkout v0.24.0  # emacs 30 is only compatible with 0.24.0
+git checkout v0.25.0  
 make
 sudo make install     # installs to /usr/local/lib
 sudo ldconfig
