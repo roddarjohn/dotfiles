@@ -37,6 +37,19 @@ This makes use literate programming
 I change my configuration from time to time, and try to not include
 portions I don't currently use.
 
+## Installing tree-sitter
+
+So..... due to ABI grammar issues, I often need to install tree-sitter from source.
+
+```sh
+git clone https://github.com/tree-sitter/tree-sitter.git
+cd tree-sitter
+git checkout v0.24.0  # emacs 30 is only compatible with 0.24.0
+make
+sudo make install     # installs to /usr/local/lib
+sudo ldconfig
+```
+
 ## Installing emacs
 
 Due to issues with emacs on COSMIC, I usually install emacs from src.
