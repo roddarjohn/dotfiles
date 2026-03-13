@@ -35,6 +35,7 @@
     (load bootstrap-file nil 'nomessage))
 
   (setq straight-use-package-by-default t)
+  (straight-pull-recipe-repositories)
 #+end_src
 
 ** load-path
@@ -482,6 +483,12 @@ Project management in emacs
 
    #+RESULTS:
    : t
+
+** cond-let
+#+begin_src emacs-lisp
+  (use-package cond-let
+    :ensure t)
+#+end_src
 
 ** magit-forge
 #+begin_src emacs-lisp

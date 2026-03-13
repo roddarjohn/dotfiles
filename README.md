@@ -64,7 +64,8 @@ git clone git@github.com:emacs-mirror/emacs.git --single-branch --branch emacs-3
 cd emacs/
 
 ./autogen.sh
-./configure --with-tree-sitter --with-pgtk
+sudo apt install libsqlite3-dev
+./configure --with-tree-sitter --with-pgtk --with-sqlite3
 
 # find out the number of processors to use in the next command
 nproc
