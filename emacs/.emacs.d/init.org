@@ -484,7 +484,7 @@ Project management in emacs
    : t
 
 ** magit-forge
-#+begin_src emacs-lisp :tangle no
+#+begin_src emacs-lisp
   (use-package forge
     :ensure t
     :after magit)
