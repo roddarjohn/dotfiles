@@ -1,62 +1,49 @@
-# Overview
+# Dotfiles
 
-This repository stores configuration files for various applications I
-use when on machines.
+Configuration files for my machines, managed with [GNU Stow](https://www.gnu.org/software/stow/).
 
-It's largely intended for personal use, but is released under no
-license for the potential benefit of others.
+## Prerequisites
 
-I often only maintain this repository when not employed or currently
-working on projects, so it may be out of date.
+Install these before running the install script:
 
-# Getting started
+### System packages
 
-You will need `stow`, `tmux`, `zsh`, `oh-my-zsh`, and `emacs` installed.
-
-To install, run:
-
-```sh
-git clone https://github.com/roddarjohn/dotfiles.git ~/dotfiles && ~/dotfiles/install.sh
+```bash
+sudo apt install \
+  stow \
+  tmux \
+  zsh \
+  git \
+  pandoc \
+  wget \
+  unzip \
+  fontconfig
 ```
 
-# Emacs
+### oh-my-zsh
 
-As is common with many `emacs` users, `emacs` serves both as a text
-editor, but also (with `org`), an organization aide, calendar client,
-email client, and much more.
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+```
 
-My `emacs` configuration is in two parts, an `init.el` file which is
-very slim. It serves to ensure `use-package` is available, as well as
-to load the org file that contains much of the remainder of the
-configuration.
+### tree-sitter (from source)
 
-This makes use literate programming
-([link](https://cs.stanford.edu/~knuth/lp.html)) in org mode, via
-`org-babel`.
+Due to ABI grammar issues, tree-sitter often needs to be built from source:
 
-I change my configuration from time to time, and try to not include
-portions I don't currently use.
-
-## Installing tree-sitter
-
-So..... due to ABI grammar issues, I often need to install tree-sitter from source.
-
-```sh
+```bash
 git clone https://github.com/tree-sitter/tree-sitter.git
 cd tree-sitter
-git checkout v0.25.0  
+git checkout v0.25.0
 make
-sudo make install     # installs to /usr/local/lib
+sudo make install
 sudo ldconfig
 ```
 
-## Installing emacs
+### Emacs (from source)
 
-Due to issues with emacs on COSMIC, I usually install emacs from src.
+Due to issues with Emacs on COSMIC, Emacs is built from source with `--with-pgtk`:
 
-The key is `--with-pgtk`
-
-```sh
+```bash
 cd /opt/
 sudo mkdir emacs
 sudo chown $USER:$USER emacs/
@@ -67,10 +54,7 @@ cd emacs/
 sudo apt install libsqlite3-dev
 ./configure --with-tree-sitter --with-pgtk --with-sqlite3
 
-# find out the number of processors to use in the next command
-nproc
-
-make bootstrap -j<number of processors>
+make bootstrap -j$(nproc)
 
 # quick test before install
 src/emacs -Q
@@ -78,15 +62,65 @@ src/emacs -Q
 sudo make install
 ```
 
-# ZSH
+## Install
 
-The zsh configuration is defined in a `.zshrc` file.
+```bash
+git clone https://github.com/roddarjohn/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./install.sh
+```
 
-The zsh configuration is short, only configuring emacs as an editor
-and a few other oh-my-zsh specifics.
+The install script will:
 
-# tmux
+1. Symlink all config files into `$HOME` via stow (`zsh`, `tmux`, `emacs`)
+2. Install [tpm](https://github.com/tmux-plugins/tpm) (tmux plugin manager)
+3. Install the Meslo Nerd Font
+4. Configure the COSMIC Terminal font
 
-The tmux configuration is stored in a `.tmux.conf` file.
+After install, open tmux and press `prefix + I` to install tmux plugins via tpm.
 
-At present, this configures key bindings and the powerline theme.
+## What's included
+
+### Emacs
+
+The Emacs configuration uses literate programming via `org-babel`. The main
+config lives in `emacs/.emacs.d/init.org`, which tangles to `emacs-config.el`.
+
+Key packages: straight.el (package manager), magit, forge, corfu, vertico,
+consult, embark, eglot, casual-suite, copilot, org-mode, mu4e.
+
+### ZSH
+
+Minimal `.zshrc` — sets Emacs as the editor and configures oh-my-zsh.
+
+### tmux
+
+Configures key bindings and the [tmux-nova](https://github.com/o0th/tmux-nova)
+status line theme. Uses tpm for plugin management.
+
+## Docs
+
+Additional guides live in `docs/`:
+
+- [Syncthing setup](docs/syncthing-setup.md) — peer-to-peer file sync across machines and Android
+
+## Post-install
+
+### First Emacs launch
+
+On first launch, straight.el will clone and build all packages. This takes a few
+minutes. Subsequent launches are fast.
+
+### Syncthing (optional)
+
+For Dropbox-like sync of org files across machines and mobile (Android/Orgzly
+Revived), see [docs/syncthing-setup.md](docs/syncthing-setup.md).
+
+Install:
+
+```bash
+sudo apt install syncthing
+systemctl --user enable --now syncthing
+```
+
+Then open http://localhost:8384 to configure.

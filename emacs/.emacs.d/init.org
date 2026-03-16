@@ -701,6 +701,15 @@ I don't fully use this right now. Perhaps I should.
     (exec-path-from-shell-initialize))
 #+end_src
 
+** markdown
+#+begin_src emacs-lisp
+  (use-package markdown-mode
+    :ensure t
+    :mode ("\\.md\\'" . markdown-mode)
+    :config
+    (setq markdown-command "pandoc"))
+#+end_src
+
 * mu4e
 ** root setup
 #+begin_src emacs-lisp
