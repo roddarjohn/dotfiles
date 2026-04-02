@@ -104,6 +104,20 @@ Additional guides live in `docs/`:
 
 - [Syncthing setup](docs/syncthing-setup.md) — peer-to-peer file sync across machines and Android
 
+### LSP servers
+
+#### jsonnet-language-server
+
+Download a pre-built binary from the [releases page](https://github.com/grafana/jsonnet-language-server/releases):
+
+```bash
+chmod +x jsonnet-language-server
+mv jsonnet-language-server ~/.local/bin/
+```
+
+Make sure `~/.local/bin` is on your `PATH`.
+
+
 ## Post-install
 
 ### First Emacs launch

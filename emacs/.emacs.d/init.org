@@ -816,12 +816,21 @@ I don't fully use this right now. Perhaps I should.
   (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
 #+end_src
 
+* jsonnet
+#+begin_src emacs-lisp
+  (use-package jsonnet-mode
+    :mode "\\.jsonnet\\'"
+    :hook (jsonnet-mode . eglot-ensure))
+#+end_src
+
 * eglot setup
 ** eglot
 #+begin_src emacs-lisp
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
   	         '((python-mode python-ts-mode) . ("uvx" "--with" "ty" "ty" "server")))
+    (add-to-list 'eglot-server-programs
+                 '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
     (keymap-set eglot-mode-map "C-c j" #'eglot-code-actions))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
@@ -865,18 +874,18 @@ I don't fully use this right now. Perhaps I should.
      (global-set-key (kbd "C-c c") 'org-capture)
 
      (setq org-capture-templates
-	   '(("n" "Note" entry (file+headline "~/org/src/orgfiles/notes.org" "Notes")
-	      "* %?\n%T\n%F\n\n%i")
-	     ("m" "Meeting Note" entry (file+olp+datetree "~/org/src/orgfiles/notes.org" "Meeting Notes")
-	      "* %?\n\n")
-	     ("l" "Link" entry (file+headline "~/org/src/orgfiles/notes.org" "Links")
-	      "* %? %^L \n%T")
-	     ("t" "To Do Item" entry (file+headline "~/org/src/orgfiles/i.org" "To Do Items")
-	      "* TODO %?\n %i\n\n" :prepend t)
-	     ("d" "Deadline Item" entry (file+headline "~/org/src/orgfiles/i.org" "Deadlines")
-	      "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
-	     ("j" "Journal" entry (file+datetree "~/org/src/orgfiles/journal.org")
-	      "* %?\nEntered on %U\n  %i\n  %a\n\n")))
+           '(("n" "Note" entry (file+headline "~/org/src/orgfiles/notes.org" "Notes")
+     	 "* %?\n%T\n%F\n\n%i")
+     	("m" "Meeting Note" entry (file+olp+datetree "~/org/src/orgfiles/notes.org" "Meeting Notes")
+     	 "* %?\n\n")
+     	("l" "Link" entry (file+headline "~/org/src/orgfiles/notes.org" "Links")
+     	 "* %? %^L \n%T")
+     	("t" "To Do Item" entry (file+headline "~/org/src/orgfiles/i.org" "To Do Items")
+     	 "* TODO %?\n %i\n\n" :prepend t)
+     	("d" "Deadline Item" entry (file+headline "~/org/src/orgfiles/i.org" "Deadlines")
+     	 "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
+     	("j" "Journal" entry (file+datetree "~/org/src/orgfiles/journal.org")
+     	 "* %?\nEntered on %U\n  %i\n  %a\n\n")))
    #+END_SRC
 
    #+RESULTS:
