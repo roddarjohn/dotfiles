@@ -873,21 +873,117 @@ I don't fully use this right now. Perhaps I should.
    #+BEGIN_SRC emacs-lisp
      (global-set-key (kbd "C-c c") 'org-capture)
 
-     (setq org-capture-templates
-           '(("n" "Note" entry (file+headline "~/org/src/orgfiles/notes.org" "Notes")
-     	 "* %?\n%T\n%F\n\n%i")
-     	("m" "Meeting Note" entry (file+olp+datetree "~/org/src/orgfiles/notes.org" "Meeting Notes")
-     	 "* %?\n\n")
-     	("l" "Link" entry (file+headline "~/org/src/orgfiles/notes.org" "Links")
-     	 "* %? %^L \n%T")
-     	("t" "To Do Item" entry (file+headline "~/org/src/orgfiles/i.org" "To Do Items")
-     	 "* TODO %?\n %i\n\n" :prepend t)
-     	("d" "Deadline Item" entry (file+headline "~/org/src/orgfiles/i.org" "Deadlines")
-     	 "* TODO %?\nDEADLINE: %^T \n %i\n\n" :prepend t)
-     	("j" "Journal" entry (file+datetree "~/org/src/orgfiles/journal.org")
-     	 "* %?\nEntered on %U\n  %i\n  %a\n\n")))
-   #+END_SRC
+     (defun my/org-capture-category (key name subdir &optional kinds)
+       "Build capture templates for a category.
+     KEY is the single-letter prefix. NAME is the display name shown in
+     the capture menu. SUBDIR is the sub-directory under
+     ~/org/src/orgfiles/ (nil puts the files directly under it).
+     KINDS is a list of symbols selecting which sub-templates to build;
+     nil means all of them. Valid kinds:
+       thought       -> <subdir>/journal.org
+       journal       -> <subdir>/journal.org (datetree)
+       deadline      -> <subdir>/inbox.org
+       meeting       -> <subdir>/notes.org (weekly datetree)
+       interview     -> <subdir>/notes.org (weekly datetree)
+       miscellaneous -> <subdir>/inbox.org (Miscellaneous heading)"
+       (let* ((all '(thought journal deadline meeting interview miscellaneous))
+              (kinds (or kinds all))
+              (dir (if subdir
+                       (format "~/org/src/orgfiles/%s/" subdir)
+                     "~/org/src/orgfiles/"))
+              (journal (concat dir "journal.org"))
+              (inbox (concat dir "inbox.org"))
+              (notes (concat dir "notes.org"))
+              (templates (list (list key name))))
+         (dolist (kind kinds)
+           (push
+            (pcase kind
+              ('thought
+               `(,(concat key "t") "Thought" entry
+                 (file ,journal)
+                 "* %?\n%U\n"))
+              ('journal
+               `(,(concat key "j") "Journal" entry
+                 (file+olp+datetree ,journal)
+                 "* %?\n%U\n"))
+              ('deadline
+               `(,(concat key "d") "Deadline" entry
+                 (file ,inbox)
+                 "* TODO %?\nDEADLINE: %^T\n%i\n" :prepend t))
+              ('meeting
+               `(,(concat key "m") "Meeting notes" entry
+                 (file+olp+datetree ,notes "Meeting notes")
+                 "* %?\n" :tree-type week))
+              ('interview
+               `(,(concat key "i") "Interview notes" entry
+                 (file+olp+datetree ,notes "Interview notes")
+                 "* %^{Interviewee} — %^{Position}\n** Overview\n** Raw notes\n%?\n** Materials\n"
+                 :tree-type week))
+              ('miscellaneous
+               `(,(concat key "x") "Miscellaneous" entry
+                 (file+headline ,inbox "Miscellaneous")
+                 "* %?\n%U\n"))
+              (_ (error "Unknown capture kind: %S" kind)))
+            templates))
+         (nreverse templates)))
 
-   #+RESULTS:
-   | n | Note | entry | (file+headline ~/org/src/orgfiles/notes.org Notes) | * %? |
+     (defvar my/org-capture-categories
+       '(("w" "Work"     "work")
+         ("p" "Personal" "personal")
+         ("t" "Talos"    "talos")
+         ("d" "Debate"   "debate"))
+       "List of (KEY NAME SUBDIR) tuples fed to `my/org-capture-category'.")
+
+     (setq org-capture-templates
+           (append
+            (mapcan (lambda (cat) (apply #'my/org-capture-category cat))
+                    my/org-capture-categories)
+            '(("m" "Miscellaneous" entry
+               (file+headline "~/org/src/orgfiles/inbox.org" "To file")
+               "* %?\n%U\n"))))
+
+     (defun my/org-category-files ()
+       "Return every org file referenced by `my/org-capture-categories'.
+     Includes the shared top-level inbox.org so it is also reachable for
+     refiling."
+       (let ((files (list (expand-file-name "~/org/src/orgfiles/inbox.org"))))
+         (dolist (cat my/org-capture-categories)
+           (let ((dir (format "~/org/src/orgfiles/%s/" (nth 2 cat))))
+             (dolist (name '("journal.org" "inbox.org" "notes.org"))
+               (push (expand-file-name (concat dir name)) files))))
+         (nreverse files)))
+
+     (setq org-refile-targets
+           '((my/org-category-files :maxlevel . 3)))
+     (setq org-refile-use-outline-path 'file
+           org-outline-path-complete-in-steps nil)
+
+     (defun my/org-insert-timestamped-item ()
+       "Start a new plain list item prefixed with the current HH:MM."
+       (interactive)
+       (end-of-line)
+       (newline)
+       (insert (format-time-string "- %H:%M ")))
+
+     (defun my/org-in-raw-notes-p ()
+       "Return non-nil when point is inside a \"Raw notes\" subtree."
+       (save-excursion
+         (and (ignore-errors (org-back-to-heading t) t)
+              (looking-at-p "^\\*+ +Raw notes\\b"))))
+
+     (defun my/org-timestamped-item-or-heading ()
+       "In a Raw notes subtree insert a timestamped list item.
+     Otherwise fall back to `org-insert-heading-respect-content'."
+       (interactive)
+       (if (my/org-in-raw-notes-p)
+           (my/org-insert-timestamped-item)
+         (call-interactively #'org-insert-heading-respect-content)))
+
+     (with-eval-after-load 'org
+       (define-key org-mode-map (kbd "C-<return>")
+                   #'my/org-timestamped-item-or-heading))
+     (with-eval-after-load 'org-capture
+       (define-key org-capture-mode-map (kbd "C-<return>")
+                   #'my/org-timestamped-item-or-heading))
+   #+END_SRC
 
