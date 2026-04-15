@@ -874,11 +874,17 @@ I don't fully use this right now. Perhaps I should.
 
    - =my-org-core.el= — shared categories, project paths, index reader,
      file-set helpers.
-   - =my-org-projects.el= — project CRUD, current-project state, letter
-     allocator, modeline segment, project transient.
+   - =my-org-projects.el= — project CRUD, current-project state, repo
+     mappings, letter allocator, modeline segment, project transient.
    - =my-org-capture.el= — category/project/current-project capture
-     templates and the Raw-notes =C-<return>= helper.
+     templates, =my/org-project-capture= entry point, Raw-notes helper.
    - =my-org-agenda.el= — agenda file sets, commands, and transient.
+   - =my-org-autoswitch.el= — global minor mode that tracks the current
+     project based on the selected buffer's git (repo, branch), plus
+     the modeline segment and minimal mode-line format.
+   - =my-org-interview.el= — interview capture template body and the
+     buffer-local =my/org-interview-mode= that rebinds =C-<return>=
+     inside =:RAW_NOTES:= subtrees.
 
    Each module defines functions and variables only. All invocation —
    keybindings, hooks, advice, refile config, modeline install, state
@@ -888,17 +894,18 @@ I don't fully use this right now. Perhaps I should.
    #+BEGIN_SRC emacs-lisp
      (require 'my-org-core)
      (require 'my-org-projects)
+     (require 'my-org-interview)
      (require 'my-org-capture)
      (require 'my-org-agenda)
+     (require 'my-org-autoswitch)
 
      ;; Restore the persisted "current project" slug.
      (my/org-current-project-load)
 
-     ;; Modeline segment showing the current project.
-     (unless (memq 'my/org-current-project-mode-line-segment
-                   mode-line-misc-info)
-       (add-to-list 'mode-line-misc-info
-                    'my/org-current-project-mode-line-segment t))
+     ;; Minimal modeline: buffer name, line number, current project.
+     ;; Defined by `my-org-autoswitch' since that module owns the
+     ;; current-project concept surfaced here.
+     (setq-default mode-line-format my/org-minimal-mode-line-format)
 
      ;; Refile targets reach every capture file + active project root.
      (setq org-refile-targets '((my/org-category-files :maxlevel . 3))
@@ -912,6 +919,7 @@ I don't fully use this right now. Perhaps I should.
      ;; Keybindings.
      (global-set-key (kbd "C-c c") #'org-capture)
      (global-set-key (kbd "C-c a") #'my/org-agenda-transient)
+     (global-set-key (kbd "C-c v") #'my/org-project-capture)
      (global-set-key (kbd "M-j")   #'my/org-project-transient)
 
      ;; Rebuild capture templates right before each capture, and once
@@ -919,12 +927,16 @@ I don't fully use this right now. Perhaps I should.
      (advice-add 'org-capture :before #'my/org-rebuild-capture-templates)
 
      (with-eval-after-load 'org
-       (my/org-rebuild-capture-templates)
-       (define-key org-mode-map (kbd "C-<return>")
-                   #'my/org-timestamped-item-or-heading))
+       (my/org-rebuild-capture-templates))
 
-     (with-eval-after-load 'org-capture
-       (define-key org-capture-mode-map (kbd "C-<return>")
-                   #'my/org-timestamped-item-or-heading))
+     ;; Interview minor mode auto-enables in any org buffer that
+     ;; already contains RAW_NOTES subtrees (on-disk files), and in
+     ;; capture buffers once the template has been inserted.
+     (add-hook 'org-mode-hook         #'my/org-interview-maybe-enable)
+     (add-hook 'org-capture-mode-hook #'my/org-interview-maybe-enable)
+
+     ;; Auto-switch the current project based on the selected buffer's
+     ;; git (repo, branch) against mappings in projects/index.org.
+     (my/org-project-autoswitch-mode 1)
    #+END_SRC
 

@@ -31,9 +31,10 @@
    "root.org" (expand-file-name slug (my/org-projects-dir))))
 
 (defun my/org-project--read-index ()
-  "Parse index.org into plists with :slug :status :created :archived-at.
-Uses a plain regex walk so we don't depend on full org-mode setup in
-a temp buffer."
+  "Parse index.org into plists.
+Keys: :slug :status :created :archived-at :repos. :repos is a list
+of strings each of form REPO or REPO@BRANCH. Uses a plain regex walk
+so we don't depend on full org-mode setup in a temp buffer."
   (let ((index (my/org-project-index-file)))
     (when (file-exists-p index)
       (with-temp-buffer
@@ -44,7 +45,8 @@ a temp buffer."
             (let ((slug (match-string 1))
                   (status "active")
                   (created nil)
-                  (archived-at nil))
+                  (archived-at nil)
+                  (repos nil))
               (save-excursion
                 (forward-line 1)
                 (when (looking-at-p "^[ \t]*:PROPERTIES:[ \t]*$")
@@ -61,9 +63,12 @@ a temp buffer."
                         (cond
                          ((string= k "STATUS")      (setq status v))
                          ((string= k "CREATED")     (setq created v))
-                         ((string= k "ARCHIVED_AT") (setq archived-at v))))))))
+                         ((string= k "ARCHIVED_AT") (setq archived-at v))
+                         ((string= k "REPOS")
+                          (setq repos (split-string v nil t)))))))))
               (push (list :slug slug :status status
-                          :created created :archived-at archived-at)
+                          :created created :archived-at archived-at
+                          :repos repos)
                     projects)))
           (nreverse projects))))))
 

@@ -12,6 +12,9 @@
 (require 'pcase)
 (require 'my-org-core)
 (require 'my-org-projects)
+(require 'my-org-interview)
+
+(defvar org-capture-templates)
 
 (defconst my/org-project-max-slots 9
   "Maximum active projects reachable from the capture menu.
@@ -66,7 +69,7 @@ nil means all of them. Valid kinds:
          ('interview
           `(,(concat key "i") "Interview notes" entry
             (file+olp+datetree ,notes "Interview notes")
-            "* %^{Interviewee} — %^{Position}\n** Overview\n** Raw notes%?\n** Materials\n"
+            ,my/org-interview-capture-template-body
             :tree-type week))
          ('miscellaneous
           `(,(concat key "x") "Miscellaneous" entry
@@ -153,28 +156,25 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
             (file+headline "~/org/src/orgfiles/inbox.org" "To file")
             "* %?\n%U\n")))))
 
-;; ---- Timestamped list items in Raw notes ------------------------
+;; ---- Current-project capture entry point -----------------------
 
-(defun my/org-insert-timestamped-item ()
-  "Start a new plain list item prefixed with the current HH:MM."
+(defun my/org-project-capture ()
+  "Start an org-capture into the current project.
+If there is no current project, pick one first (which may also
+prompt to save a repo/branch mapping). Reads a single char for the
+template kind — [t]odo, [r]eference, [p]ointer — and hands off to
+`org-capture' with the resolved leaf key (e.g. \".t\"). The
+`:before' advice on `org-capture' rebuilds the template list, so
+the leaf is guaranteed to exist when capture reads it."
   (interactive)
-  (end-of-line)
-  (newline)
-  (insert (format-time-string "- %H:%M ")))
-
-(defun my/org-in-raw-notes-p ()
-  "Return non-nil when point is inside a \"Raw notes\" subtree."
-  (save-excursion
-    (and (ignore-errors (org-back-to-heading t) t)
-         (looking-at-p "^\\*+ +Raw notes\\b"))))
-
-(defun my/org-timestamped-item-or-heading ()
-  "In a Raw notes subtree insert a timestamped list item.
-Otherwise fall back to `org-insert-heading-respect-content'."
-  (interactive)
-  (if (my/org-in-raw-notes-p)
-      (my/org-insert-timestamped-item)
-    (call-interactively #'org-insert-heading-respect-content)))
+  (unless my/org-current-project
+    (call-interactively #'my/org-project-set-current))
+  (when my/org-current-project
+    (let ((c (read-char-choice
+              (format "Capture into %s: [t]odo [r]eference [p]ointer: "
+                      my/org-current-project)
+              '(?t ?r ?p))))
+      (org-capture nil (format ".%c" c)))))
 
 (provide 'my-org-capture)
 ;;; my-org-capture.el ends here

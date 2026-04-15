@@ -13,6 +13,11 @@
 (require 'transient)
 (require 'my-org-core)
 
+(declare-function my/org-project-autoswitch-mode "my-org-autoswitch")
+(declare-function org-set-property "org")
+(declare-function org-entry-add-to-multivalued-property "org")
+(declare-function org-entry-remove-from-multivalued-property "org")
+
 (defconst my/org-project-root-template
   "#+title: %s\n#+category: %s\n\n* Tasks\n* Reference\n* Pointers\n"
   "Seed written into a new project's root.org.
@@ -69,10 +74,154 @@ can't get a free letter are omitted."
           (push (cons slug (string chosen)) result))))
     (nreverse result)))
 
+;; ---- Repo/branch mappings ---------------------------------------
+
+(defun my/org-project-git-context ()
+  "Return (REPO . BRANCH) for the current buffer, or nil.
+REPO is the git top-level absolute path (no trailing slash). BRANCH is
+the symbolic ref from `git rev-parse --abbrev-ref HEAD', or nil on
+detached HEAD."
+  (let ((root (locate-dominating-file default-directory ".git")))
+    (when root
+      (let* ((repo (directory-file-name (expand-file-name root)))
+             (branch
+              (with-temp-buffer
+                (let ((default-directory (file-name-as-directory repo)))
+                  (when (zerop (call-process
+                                "git" nil t nil
+                                "rev-parse" "--abbrev-ref" "HEAD"))
+                    (let ((s (string-trim (buffer-string))))
+                      (unless (string= s "HEAD") s)))))))
+        (cons repo branch)))))
+
+(defun my/org-project--parse-mapping (str)
+  "Parse `REPO' or `REPO@BRANCH' into (REPO . BRANCH-or-nil).
+Splits on the rightmost `@' so repo paths containing `@' still parse."
+  (if (string-match "\\`\\(.+\\)@\\([^@]+\\)\\'" str)
+      (cons (match-string 1 str) (match-string 2 str))
+    (cons str nil)))
+
+(defun my/org-project--format-mapping (repo &optional branch)
+  "Format REPO and optional BRANCH as a mapping string."
+  (if (and branch (not (string-empty-p branch)))
+      (format "%s@%s" repo branch)
+    repo))
+
+(defun my/org-project-find-by-context (repo branch)
+  "Return the active project slug matching REPO and BRANCH, or nil.
+A bare REPO mapping matches any branch; a REPO@BRANCH mapping must
+match exactly. Branch-specific mappings take precedence over
+any-branch mappings."
+  (let ((projects (my/org-project--read-index))
+        exact any)
+    (dolist (p projects)
+      (when (string= (plist-get p :status) "active")
+        (dolist (m (plist-get p :repos))
+          (let ((parsed (my/org-project--parse-mapping m)))
+            (when (equal (car parsed) repo)
+              (cond
+               ((null (cdr parsed))
+                (unless any (setq any (plist-get p :slug))))
+               ((and branch (equal (cdr parsed) branch))
+                (unless exact (setq exact (plist-get p :slug))))))))))
+    (or exact any)))
+
+(defun my/org-project--goto-heading (slug)
+  "Move point to SLUG's heading in the current index buffer, or error."
+  (goto-char (point-min))
+  (unless (re-search-forward
+           (format "^\\*+ +%s *$" (regexp-quote slug)) nil t)
+    (user-error "%s not found in index" slug)))
+
+(defun my/org-project--mapping-conflict-p (new-branch existing-branch)
+  "Return non-nil if an existing mapping conflicts with a new one.
+Both arguments may be nil, representing an any-branch mapping. A
+conflict means the two mappings could match the same (repo, branch)
+context. Any-branch on either side clobbers specific branches on the
+other side, since an unambiguous lookup shouldn't be possible
+afterwards."
+  (cond
+   ((null new-branch) t)                   ; new any-branch takes the whole repo
+   ((null existing-branch) t)              ; existing any-branch already covers us
+   (t (equal new-branch existing-branch))))
+
+(defun my/org-project--clear-conflicting-mappings (slug repo branch)
+  "Remove mappings matching REPO[@BRANCH] from projects other than SLUG.
+Returns a list of (OTHER-SLUG . MAPPING-STRING) pairs that were removed."
+  (let (cleared)
+    (dolist (p (my/org-project--read-index))
+      (let ((other (plist-get p :slug)))
+        (unless (equal other slug)
+          (dolist (m (plist-get p :repos))
+            (let* ((parsed (my/org-project--parse-mapping m))
+                   (r (car parsed))
+                   (b (cdr parsed)))
+              (when (and (equal r repo)
+                         (my/org-project--mapping-conflict-p branch b))
+                (my/org-project-remove-mapping other r b)
+                (push (cons other m) cleared)))))))
+    (nreverse cleared)))
+
+(defun my/org-project-add-mapping (slug repo &optional branch)
+  "Add REPO[@BRANCH] to SLUG's :REPOS: multi-value property.
+Before adding, removes any mapping from other active projects that
+would match the same (repo, branch), so the lookup remains
+unambiguous."
+  (let ((cleared (my/org-project--clear-conflicting-mappings slug repo branch))
+        (index (my/org-project-index-file))
+        (value (my/org-project--format-mapping repo branch)))
+    (with-current-buffer (find-file-noselect index)
+      (save-excursion
+        (my/org-project--goto-heading slug)
+        (org-entry-add-to-multivalued-property (point) "REPOS" value))
+      (save-buffer))
+    (when cleared
+      (message "Cleared conflicting mapping%s: %s"
+               (if (> (length cleared) 1) "s" "")
+               (mapconcat (lambda (c) (format "%s → %s" (cdr c) (car c)))
+                          cleared ", ")))))
+
+(defun my/org-project-remove-mapping (slug repo &optional branch)
+  "Remove REPO[@BRANCH] from SLUG's :REPOS: multi-value property."
+  (let ((index (my/org-project-index-file))
+        (value (my/org-project--format-mapping repo branch)))
+    (with-current-buffer (find-file-noselect index)
+      (save-excursion
+        (my/org-project--goto-heading slug)
+        (org-entry-remove-from-multivalued-property (point) "REPOS" value))
+      (save-buffer))))
+
+(defun my/org-project--read-save-choice (repo branch)
+  "Prompt for how to save a mapping for REPO.
+Returns one of the symbols `this-branch', `any-branch', or `cancel'."
+  (let ((c (read-char-choice
+            (format "Save mapping for %s%s? [y]es-this-branch [a]ny-branch [n]o: "
+                    repo
+                    (if branch (format " (branch %s)" branch) ""))
+            '(?y ?a ?n))))
+    (pcase c (?y 'this-branch) (?a 'any-branch) (?n 'cancel))))
+
+(defun my/org-project--maybe-save-context-mapping (slug)
+  "After setting SLUG as current, offer to save the current repo/branch.
+Skips the prompt when we're not inside a git repo or when the current
+(repo, branch) already maps to SLUG. Conflict handling is delegated
+to `my/org-project-add-mapping'."
+  (when-let ((ctx (my/org-project-git-context)))
+    (let* ((repo (car ctx))
+           (branch (cdr ctx))
+           (existing (my/org-project-find-by-context repo branch)))
+      (unless (equal existing slug)
+        (pcase (my/org-project--read-save-choice repo branch)
+          ('this-branch (my/org-project-add-mapping slug repo branch))
+          ('any-branch  (my/org-project-add-mapping slug repo nil))
+          ('cancel      nil))))))
+
 ;; ---- Set / clear current project --------------------------------
 
 (defun my/org-project-set-current ()
-  "Pick the current project. Uses `completing-read' (vertico handles UI)."
+  "Pick the current project.
+When invoked inside a git repo, also offers to persist the current
+(repo, branch) as a mapping for the chosen project."
   (interactive)
   (let* ((slugs (my/org-project-active-slugs))
          (_ (unless slugs (user-error "No active projects")))
@@ -80,6 +229,7 @@ can't get a free letter are omitted."
     (setq my/org-current-project choice)
     (my/org-current-project-save)
     (force-mode-line-update t)
+    (my/org-project--maybe-save-context-mapping choice)
     (message "Current project: %s" choice)))
 
 (defun my/org-project-clear-current ()
@@ -170,14 +320,42 @@ in the project's index.org entry."
       (force-mode-line-update t)
       (message "Archived %s" slug))))
 
-;; ---- Modeline segment (install from init.org) -------------------
+;; ---- Interactive mapping commands -------------------------------
 
-(defvar my/org-current-project-mode-line-segment
-  '(:eval (when my/org-current-project
-            (propertize (format " [proj: %s]" my/org-current-project)
-                        'face 'mode-line-emphasis
-                        'help-echo "Current org capture project"))))
-(put 'my/org-current-project-mode-line-segment 'risky-local-variable t)
+(defun my/org-project-mapping-add-here ()
+  "Map the current buffer's (repo, branch) to a project of your choice."
+  (interactive)
+  (let ((ctx (my/org-project-git-context)))
+    (unless ctx (user-error "Not inside a git repo"))
+    (let* ((slugs (my/org-project-active-slugs))
+           (_ (unless slugs (user-error "No active projects")))
+           (slug (completing-read "Add mapping to project: " slugs nil t))
+           (repo (car ctx))
+           (branch (cdr ctx)))
+      (pcase (my/org-project--read-save-choice repo branch)
+        ('this-branch
+         (my/org-project-add-mapping slug repo branch)
+         (message "Mapped %s@%s → %s" repo branch slug))
+        ('any-branch
+         (my/org-project-add-mapping slug repo nil)
+         (message "Mapped %s (any branch) → %s" repo slug))
+        ('cancel (message "Cancelled"))))))
+
+(defun my/org-project-mapping-remove-here ()
+  "Remove any mapping that matches the current buffer's (repo, branch)."
+  (interactive)
+  (let ((ctx (my/org-project-git-context)))
+    (unless ctx (user-error "Not inside a git repo"))
+    (let* ((repo (car ctx))
+           (branch (cdr ctx))
+           (slug (my/org-project-find-by-context repo branch)))
+      (unless slug
+        (user-error "No mapping matches %s%s"
+                    repo (if branch (concat "@" branch) "")))
+      ;; A match could be branch-specific or any-branch; try both.
+      (my/org-project-remove-mapping slug repo branch)
+      (my/org-project-remove-mapping slug repo nil)
+      (message "Removed mapping %s → %s" repo slug))))
 
 ;; ---- Transient menu ---------------------------------------------
 
@@ -191,6 +369,10 @@ in the project's index.org entry."
   ["Current project"
    ("s" "Set current"        my/org-project-set-current)
    ("c" "Clear current"      my/org-project-clear-current)]
+  ["Mappings"
+   ("M" "Map current repo"    my/org-project-mapping-add-here)
+   ("R" "Unmap current repo"  my/org-project-mapping-remove-here)
+   ("T" "Toggle autoswitch"   my/org-project-autoswitch-mode)]
   ["Goto file"
    ("f" "Top-level org file" my/org-goto-toplevel-file)])
 
