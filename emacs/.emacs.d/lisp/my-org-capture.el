@@ -158,7 +158,7 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
          (my/org-current-project-capture-templates)
          '(("J" "Journal" entry
             (file+olp+datetree "~/org/src/orgfiles/journal.org")
-            "* %?\n")
+            "* Entry - %<%H:%M>\n%?\n")
            ("x" "Miscellaneous" entry
             (file+headline "~/org/src/orgfiles/inbox.org" "To file")
             "* %?\n%U\n")))))
