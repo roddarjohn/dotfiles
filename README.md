@@ -89,6 +89,9 @@ config lives in `emacs/.emacs.d/init.org`, which tangles to `emacs-config.el`.
 Key packages: straight.el (package manager), magit, forge, corfu, vertico,
 consult, embark, eglot, casual-suite, copilot, org-mode, mu4e.
 
+The custom `my-org-*` modules under `emacs/.emacs.d/lisp/` are documented in
+[docs/my-org-modules.md](docs/my-org-modules.md).
+
 ### ZSH
 
 Minimal `.zshrc` — sets Emacs as the editor and configures oh-my-zsh.
@@ -102,6 +105,7 @@ status line theme. Uses tpm for plugin management.
 
 Additional guides live in `docs/`:
 
+- [`my-org-*` modules](docs/my-org-modules.md) — custom org layer for category-scoped capture/agenda, projects, and interview notes
 - [Syncthing setup](docs/syncthing-setup.md) — peer-to-peer file sync across machines and Android
 
 ### LSP servers
