@@ -17,10 +17,20 @@
 (declare-function org-set-property "org")
 (declare-function org-entry-add-to-multivalued-property "org")
 (declare-function org-entry-remove-from-multivalued-property "org")
+(declare-function org-clock-in "org-clock")
+(declare-function org-clock-out "org-clock")
+(declare-function org-clock-goto "org-clock")
+(declare-function org-clock-in-last "org-clock")
+(declare-function org-clocking-p "org-clock")
 
 (defconst my/org-project-root-template
   "#+title: %s\n#+category: %s\n\n* Tasks\n* Reference\n* Pointers\n"
   "Seed written into a new project's root.org.
+Receives the slug twice (title then category).")
+
+(defconst my/org-project-whiteboard-template
+  "#+title: %s whiteboard\n#+category: %s\n\n"
+  "Seed written into a new project's whiteboard.org.
 Receives the slug twice (title then category).")
 
 ;; ---- Current project state --------------------------------------
@@ -247,12 +257,15 @@ When invoked inside a git repo, also offers to persist the current
   (interactive (list (read-string "New project slug: ")))
   (let* ((dir (expand-file-name slug (my/org-projects-dir)))
          (root (expand-file-name "root.org" dir))
+         (whiteboard (expand-file-name "whiteboard.org" dir))
          (index (my/org-project-index-file)))
     (when (file-exists-p dir)
       (user-error "Project already exists: %s" dir))
     (make-directory dir t)
     (with-temp-file root
       (insert (format my/org-project-root-template slug slug)))
+    (with-temp-file whiteboard
+      (insert (format my/org-project-whiteboard-template slug slug)))
     (unless (file-exists-p index)
       (with-temp-file index
         (insert "#+title: Projects\n\n")))
@@ -286,6 +299,27 @@ When invoked inside a git repo, also offers to persist the current
       (user-error "No active projects"))
     (let ((slug (completing-read "Go to project: " slugs nil t)))
       (find-file (my/org-project-root-file slug)))))
+
+(defun my/org-project-goto-all ()
+  "Pick any project (active or archived) and open its root.org.
+Archived entries are annotated so you can distinguish them in the
+completion list."
+  (interactive)
+  (let* ((projects (my/org-project--read-index))
+         (_ (unless projects (user-error "No projects")))
+         (status-by-slug
+          (mapcar (lambda (p)
+                    (cons (plist-get p :slug) (plist-get p :status)))
+                  projects))
+         (candidates (sort (mapcar #'car status-by-slug) #'string<))
+         (annot (lambda (cand)
+                  (if (equal (cdr (assoc cand status-by-slug)) "archived")
+                      "  [archived]"
+                    "")))
+         (completion-extra-properties
+          (list :annotation-function annot))
+         (slug (completing-read "Go to project (all): " candidates nil t)))
+    (find-file (my/org-project-root-file slug))))
 
 (defun my/org-goto-toplevel-file ()
   "Pick a category-based top-level org file and open it."
@@ -357,24 +391,82 @@ in the project's index.org entry."
       (my/org-project-remove-mapping slug repo nil)
       (message "Removed mapping %s → %s" repo slug))))
 
+;; ---- Clocking ---------------------------------------------------
+;;
+;; We clock on the `* <slug>' heading in projects/index.org rather than
+;; per-task headings inside root.org. Each project therefore has a
+;; single LOGBOOK drawer in index.org that accumulates across sessions,
+;; which matches the "track time on the project as a whole" intent.
+
+(defun my/org-project--clock-in-on-slug (slug)
+  "Clock in on SLUG's heading in projects/index.org."
+  (require 'org-clock)
+  (let ((index (my/org-project-index-file)))
+    (unless (file-exists-p index)
+      (user-error "No projects yet"))
+    (with-current-buffer (find-file-noselect index)
+      (save-excursion
+        (my/org-project--goto-heading slug)
+        (org-clock-in))
+      (save-buffer))))
+
+(defun my/org-project-clock-in ()
+  "Clock in on a project's index.org heading.
+Defaults to the current project; prompts among active projects if
+none is set. Does not change `my/org-current-project'."
+  (interactive)
+  (require 'org-clock)
+  (let* ((slugs (my/org-project-active-slugs))
+         (_ (unless slugs (user-error "No active projects")))
+         (slug (or my/org-current-project
+                   (completing-read "Clock in on project: " slugs nil t))))
+    (my/org-project--clock-in-on-slug slug)
+    (message "Clocked in on %s" slug)))
+
+(defun my/org-project-clock-out ()
+  "Clock out of the active clock."
+  (interactive)
+  (require 'org-clock)
+  (if (org-clocking-p)
+      (org-clock-out)
+    (user-error "No active clock")))
+
+(defun my/org-project-clock-goto ()
+  "Jump to the currently-clocked heading."
+  (interactive)
+  (require 'org-clock)
+  (org-clock-goto))
+
+(defun my/org-project-clock-in-last ()
+  "Resume the last clocked task."
+  (interactive)
+  (require 'org-clock)
+  (org-clock-in-last))
+
 ;; ---- Transient menu ---------------------------------------------
 
 (transient-define-prefix my/org-project-transient ()
-  "Manage org-capture projects and jump around org files."
+  "Manage org-capture projects, clocks, and jumps."
   ["Projects"
-   ("g" "Goto project"       my/org-project-goto)
-   ("n" "New project"        my/org-project-new)
-   ("a" "Archive project"    my/org-project-archive)
-   ("l" "List (open index)"  my/org-project-list)]
+   ("g" "Goto active"         my/org-project-goto)
+   ("G" "Goto all"            my/org-project-goto-all)
+   ("n" "New project"         my/org-project-new)
+   ("a" "Archive project"     my/org-project-archive)
+   ("l" "List (open index)"   my/org-project-list)]
   ["Current project"
-   ("s" "Set current"        my/org-project-set-current)
-   ("c" "Clear current"      my/org-project-clear-current)]
+   ("s" "Set current"         my/org-project-set-current)
+   ("c" "Clear current"       my/org-project-clear-current)]
+  ["Clock"
+   ("i" "Clock in"            my/org-project-clock-in)
+   ("o" "Clock out"           my/org-project-clock-out)
+   ("I" "Clock in last"       my/org-project-clock-in-last)
+   ("j" "Goto clock"          my/org-project-clock-goto)]
   ["Mappings"
    ("M" "Map current repo"    my/org-project-mapping-add-here)
    ("R" "Unmap current repo"  my/org-project-mapping-remove-here)
    ("T" "Toggle autoswitch"   my/org-project-autoswitch-mode)]
   ["Goto file"
-   ("f" "Top-level org file" my/org-goto-toplevel-file)])
+   ("f" "Top-level org file"  my/org-goto-toplevel-file)])
 
 (provide 'my-org-projects)
 ;;; my-org-projects.el ends here

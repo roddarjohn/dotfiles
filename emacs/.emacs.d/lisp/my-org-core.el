@@ -30,6 +30,11 @@
   (expand-file-name
    "root.org" (expand-file-name slug (my/org-projects-dir))))
 
+(defun my/org-project-whiteboard-file (slug)
+  "Return the whiteboard.org file for SLUG."
+  (expand-file-name
+   "whiteboard.org" (expand-file-name slug (my/org-projects-dir))))
+
 (defun my/org-project--read-index ()
   "Parse index.org into plists.
 Keys: :slug :status :created :archived-at :repos. :repos is a list
@@ -90,7 +95,7 @@ journal/inbox/notes files, whether or not they exist on disk."
                               "~/org/src/orgfiles/inbox.org")))))
     (dolist (cat my/org-capture-categories)
       (let ((subdir (nth 2 cat)))
-        (dolist (name '("journal" "inbox" "notes"))
+        (dolist (name '("journal" "inbox" "notes" "whiteboard"))
           (push (cons (format "%s/%s" subdir name)
                       (expand-file-name
                        (format "~/org/src/orgfiles/%s/%s.org" subdir name)))
@@ -106,10 +111,11 @@ refile can reach them."
     (dolist (cat my/org-capture-categories)
       (let* ((subdir (nth 2 cat))
              (dir (format "~/org/src/orgfiles/%s/" subdir)))
-        (dolist (name '("journal.org" "inbox.org" "notes.org"))
+        (dolist (name '("journal.org" "inbox.org" "notes.org" "whiteboard.org"))
           (push (expand-file-name (concat dir name)) files))))
     (dolist (slug (my/org-project-active-slugs))
-      (push (my/org-project-root-file slug) files))
+      (push (my/org-project-root-file slug) files)
+      (push (my/org-project-whiteboard-file slug) files))
     (nreverse files)))
 
 (provide 'my-org-core)

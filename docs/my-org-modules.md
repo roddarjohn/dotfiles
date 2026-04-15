@@ -19,7 +19,8 @@ Shared data and path helpers used by everything else.
 - `my/org-capture-categories` — the `(KEY NAME SUBDIR)` tuples that
   drive both capture and agenda (work/personal/talos/debate by default).
 - Project path helpers: `my/org-projects-dir`,
-  `my/org-project-index-file`, `my/org-project-root-file`.
+  `my/org-project-index-file`, `my/org-project-root-file`,
+  `my/org-project-whiteboard-file`.
 - `my/org-project--read-index` — regex walker that parses
   `projects/index.org` into plists with `:slug :status :created
   :archived-at :repos`. Chosen over real org-mode parsing so the rest of
@@ -38,10 +39,21 @@ mapping layer.
 - Current project: `my/org-current-project`, persisted to
   `~/.emacs.d/my-org-current-project.el` via `my/org-current-project-load`
   and `my/org-current-project-save`.
-- CRUD: `my/org-project-new`, `my/org-project-archive` (also stamps
-  `:ARCHIVED_AT:`), `my/org-project-list`, `my/org-project-goto`,
+- CRUD: `my/org-project-new` (seeds both `root.org` and
+  `whiteboard.org`), `my/org-project-archive` (also stamps
+  `:ARCHIVED_AT:`), `my/org-project-list`, `my/org-project-goto`
+  (active only), `my/org-project-goto-all` (includes archived, with
+  `[archived]` annotation in the completion list),
   `my/org-project-set-current`, `my/org-project-clear-current`,
   `my/org-goto-toplevel-file`.
+- Clocking: `my/org-project-clock-in` (clocks in on the `* <slug>`
+  heading in `projects/index.org`, defaulting to the current project
+  and prompting if unset), `my/org-project-clock-out`,
+  `my/org-project-clock-goto`, `my/org-project-clock-in-last`. All
+  clock entries accumulate in a single LOGBOOK drawer per project
+  inside index.org, so "time spent on project X" is always one place.
+  The index regex walker tolerates LOGBOOK drawers alongside
+  PROPERTIES.
 - Letter-key allocation: `my/org-project--allocate-letter-keys` is
   shared by capture and agenda so both surfaces use the same single-
   letter shortcut for a given slug.
@@ -86,19 +98,21 @@ Capture template builders and the current-project capture entry point.
 - `my/org-capture-category` — builds a capture group from a
   `(KEY NAME SUBDIR)` tuple plus an optional list of `kinds`
   (`thought`, `journal`, `deadline`, `meeting`, `interview`,
-  `miscellaneous`).
+  `whiteboard`, `miscellaneous`).
 - `my/org-capture-project-templates` — generates `j`-prefixed templates
   for every active project, both digit slots (`j1`…`j9`) and single-
-  letter shortcuts where available.
+  letter shortcuts where available. Each group carries todo/reference/
+  pointer plus a whiteboard entry into `<project>/whiteboard.org`.
 - `my/org-current-project-capture-templates` — generates the `.`-prefix
-  templates for the current project, if any.
+  templates for the current project, if any (includes `.w` for
+  whiteboard).
 - `my/org-rebuild-capture-templates` — rebuilds `org-capture-templates`
   from scratch. Wired as a `:before` advice on `org-capture` and also
   called from `org`'s post-load hook.
-- `my/org-project-capture` — reads `[t]odo [r]eference [p]ointer` and
-  delegates to `(org-capture nil ".<c>")`. If no current project is
-  set, runs `my/org-project-set-current` first (which may persist a
-  mapping).
+- `my/org-project-capture` — reads
+  `[t]odo [r]eference [p]ointer [w]hiteboard` and delegates to
+  `(org-capture nil ".<c>")`. If no current project is set, runs
+  `my/org-project-set-current` first (which may persist a mapping).
 
 ### `my-org-agenda.el`
 Agenda dispatcher scoped to the capture layout.
@@ -150,12 +164,17 @@ minimal modeline format used system-wide.
 
 | Column           | Key | Command                               |
 |------------------|-----|---------------------------------------|
-| Projects         | `g` | `my/org-project-goto`                 |
+| Projects         | `g` | `my/org-project-goto` (active only)   |
+|                  | `G` | `my/org-project-goto-all` (incl. archived) |
 |                  | `n` | `my/org-project-new`                  |
 |                  | `a` | `my/org-project-archive`              |
 |                  | `l` | `my/org-project-list` (open index)    |
 | Current project  | `s` | `my/org-project-set-current`          |
 |                  | `c` | `my/org-project-clear-current`        |
+| Clock            | `i` | `my/org-project-clock-in`             |
+|                  | `o` | `my/org-project-clock-out`            |
+|                  | `I` | `my/org-project-clock-in-last`        |
+|                  | `j` | `my/org-project-clock-goto`           |
 | Mappings         | `M` | `my/org-project-mapping-add-here`     |
 |                  | `R` | `my/org-project-mapping-remove-here`  |
 |                  | `T` | `my/org-project-autoswitch-mode` toggle |
@@ -190,6 +209,7 @@ carrying the full set of kinds from `my/org-capture-category`:
 | `d`    | Deadline        | `<cat>/inbox.org`                   |
 | `m`    | Meeting notes   | `<cat>/notes.org` (weekly datetree) |
 | `i`    | Interview notes | `<cat>/notes.org` (weekly datetree) |
+| `w`    | Whiteboard      | `<cat>/whiteboard.org` (prepended)  |
 | `x`    | Miscellaneous   | `<cat>/inbox.org` under *Miscellaneous* |
 
 Project-specific keys live under the `j` prefix:
@@ -201,6 +221,7 @@ Project-specific keys live under the `j` prefix:
 | `jXt`      | Todo under that project's *Tasks*                 |
 | `jXr`      | Reference under that project's *Reference*        |
 | `jXp`      | Pointer (captures `%a` link) under *Pointers*     |
+| `jXw`      | Whiteboard entry in `<project>/whiteboard.org`    |
 
 The current project is reachable under the `.` prefix:
 
@@ -209,6 +230,7 @@ The current project is reachable under the `.` prefix:
 | `.t` | Todo in the current project                         |
 | `.r` | Reference in the current project                    |
 | `.p` | Pointer in the current project                      |
+| `.w` | Whiteboard entry in the current project              |
 
 Top-level catch-all:
 
@@ -228,9 +250,24 @@ One level-1 heading per project. Properties used:
   `REPO@BRANCH`. Bare `REPO` matches any branch. Repo paths containing
   spaces are not supported.
 
+`my/org-project-clock-in` also clocks on this heading, so each project
+accumulates a `:LOGBOOK:` drawer of CLOCK entries here. The drawer sits
+alongside `:PROPERTIES:` and the index regex walker tolerates it.
+
 ### `projects/<slug>/root.org`
 Three fixed subtrees: `Tasks`, `Reference`, `Pointers`. Capture
 templates under `j`/`.` target these by headline.
+
+### `projects/<slug>/whiteboard.org`
+Freeform scratch file, seeded with just a `#+title:` line. Capture
+templates `jXw` and `.w` prepend timestamped entries. Created by
+`my/org-project-new`; for projects that predate the feature, the file
+is created lazily the first time something is captured into it.
+
+### `<category>/whiteboard.org`
+Analogous freeform scratch file at the category level, reached via the
+`w` suffix under the category prefix (e.g. `ww` for Work whiteboard).
+Created lazily by org-capture on first use.
 
 ### `my/org-interview-property`
 Subtree property `:INTERVIEW_MODE: t`, written by the interview capture

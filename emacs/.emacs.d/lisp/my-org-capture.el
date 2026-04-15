@@ -37,8 +37,9 @@ nil means all of them. Valid kinds:
   deadline      -> <subdir>/inbox.org
   meeting       -> <subdir>/notes.org (weekly datetree)
   interview     -> <subdir>/notes.org (weekly datetree)
+  whiteboard    -> <subdir>/whiteboard.org (prepended)
   miscellaneous -> <subdir>/inbox.org (Miscellaneous heading)"
-  (let* ((all '(thought journal deadline meeting interview miscellaneous))
+  (let* ((all '(thought journal deadline meeting interview whiteboard miscellaneous))
          (kinds (or kinds all))
          (dir (if subdir
                   (format "~/org/src/orgfiles/%s/" subdir)
@@ -46,6 +47,7 @@ nil means all of them. Valid kinds:
          (journal (concat dir "journal.org"))
          (inbox (concat dir "inbox.org"))
          (notes (concat dir "notes.org"))
+         (whiteboard (concat dir "whiteboard.org"))
          (templates (list (list key name))))
     (dolist (kind kinds)
       (push
@@ -71,6 +73,10 @@ nil means all of them. Valid kinds:
             (file+olp+datetree ,notes "Interview notes")
             ,my/org-interview-capture-template-body
             :tree-type week))
+         ('whiteboard
+          `(,(concat key "w") "Whiteboard" entry
+            (file ,whiteboard)
+            "* %?\n%U\n" :prepend t))
          ('miscellaneous
           `(,(concat key "x") "Miscellaneous" entry
             (file+headline ,inbox "Miscellaneous")
@@ -81,8 +87,8 @@ nil means all of them. Valid kinds:
 
 ;; ---- Per-project template builders ------------------------------
 
-(defun my/org-project--template-group (prefix description root)
-  "Return the four-entry template group (group header + t/r/p) for ROOT."
+(defun my/org-project--template-group (prefix description root whiteboard)
+  "Return the template group (header + t/r/p/w) for ROOT and WHITEBOARD."
   (list
    (list prefix description)
    `(,(concat prefix "t") "Todo" entry
@@ -93,7 +99,10 @@ nil means all of them. Valid kinds:
      "* %?\n%U\n")
    `(,(concat prefix "p") "Pointer" entry
      (file+headline ,root "Pointers")
-     "* %?\n%a\n%U\n")))
+     "* %?\n%a\n%U\n")
+   `(,(concat prefix "w") "Whiteboard" entry
+     (file ,whiteboard)
+     "* %?\n%U\n" :prepend t)))
 
 (defun my/org-capture-project-templates ()
   "Return capture entries for every active project under the `j' prefix.
@@ -111,17 +120,19 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
     (dolist (slug slugs)
       (setq idx (1+ idx))
       (let* ((root (my/org-project-root-file slug))
+             (whiteboard (my/org-project-whiteboard-file slug))
              (num-prefix (format "%s%d" my/org-project-capture-prefix idx))
              (letter (cdr (assoc slug letter-alist)))
              (label (if letter
                         (format "%s (%s)" slug letter)
                       slug)))
-        (dolist (entry (my/org-project--template-group num-prefix label root))
+        (dolist (entry (my/org-project--template-group
+                        num-prefix label root whiteboard))
           (push entry templates))
         (when letter
           (let ((let-prefix (concat my/org-project-capture-prefix letter)))
             (dolist (entry (my/org-project--template-group
-                            let-prefix slug root))
+                            let-prefix slug root whiteboard))
               (push entry templates))))))
     (nreverse templates)))
 
@@ -130,6 +141,7 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
   (when (and my/org-current-project
              (member my/org-current-project (my/org-project-active-slugs)))
     (let ((root (my/org-project-root-file my/org-current-project))
+          (whiteboard (my/org-project-whiteboard-file my/org-current-project))
           (slug my/org-current-project))
       `(("." ,(format "Current project (%s)" slug))
         (".t" "Todo" entry
@@ -140,7 +152,10 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
          "* %?\n%U\n")
         (".p" "Pointer" entry
          (file+headline ,root "Pointers")
-         "* %?\n%a\n%U\n")))))
+         "* %?\n%a\n%U\n")
+        (".w" "Whiteboard" entry
+         (file ,whiteboard)
+         "* %?\n%U\n" :prepend t)))))
 
 ;; ---- Dynamic rebuild --------------------------------------------
 
@@ -162,18 +177,18 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
   "Start an org-capture into the current project.
 If there is no current project, pick one first (which may also
 prompt to save a repo/branch mapping). Reads a single char for the
-template kind — [t]odo, [r]eference, [p]ointer — and hands off to
-`org-capture' with the resolved leaf key (e.g. \".t\"). The
-`:before' advice on `org-capture' rebuilds the template list, so
+template kind — [t]odo, [r]eference, [p]ointer, [w]hiteboard — and
+hands off to `org-capture' with the resolved leaf key (e.g. \".t\").
+The `:before' advice on `org-capture' rebuilds the template list, so
 the leaf is guaranteed to exist when capture reads it."
   (interactive)
   (unless my/org-current-project
     (call-interactively #'my/org-project-set-current))
   (when my/org-current-project
     (let ((c (read-char-choice
-              (format "Capture into %s: [t]odo [r]eference [p]ointer: "
+              (format "Capture into %s: [t]odo [r]eference [p]ointer [w]hiteboard: "
                       my/org-current-project)
-              '(?t ?r ?p))))
+              '(?t ?r ?p ?w))))
       (org-capture nil (format ".%c" c)))))
 
 (provide 'my-org-capture)
