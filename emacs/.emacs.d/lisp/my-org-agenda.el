@@ -1,14 +1,16 @@
-;;; my-org-agenda.el --- Agenda setup tied to my-org-capture -*- lexical-binding: t; -*-
+;;; my-org-agenda.el --- Agenda dispatcher tied to the my-org layout -*- lexical-binding: t; -*-
 
-;; Agenda on top of the capture layout in `my-org-capture'.
+;; Agenda on top of the capture layout defined across `my-org-core' and
+;; `my-org-projects'.
 ;;
 ;; Agenda file scope: the top-level inbox, each <category>/inbox.org, and
 ;; every active project's root.org. Journals and notes are excluded to
 ;; keep the view focused on actual tasks.
 ;;
-;; Entry point: `C-c a' opens `my/org-agenda-transient' which offers an
-;; "everything" view, a category picker, and a project picker. The raw
-;; org-agenda dispatcher is still reachable from the transient under `d'.
+;; Entry point: `my/org-agenda-transient' offers an "everything" view, a
+;; category picker, and a project picker. The raw org-agenda dispatcher
+;; is reachable under `d'. Keybindings and the initial file-set refresh
+;; are wired up from init.org.
 
 ;;; Code:
 
@@ -16,7 +18,8 @@
 (require 'seq)
 (require 'transient)
 (require 'org-agenda)
-(require 'my-org-capture)
+(require 'my-org-core)
+(require 'my-org-projects)
 
 ;; ---- File-set helpers -------------------------------------------
 
@@ -48,8 +51,6 @@ Called explicitly from entry points that want the \"everything\" view.
 We deliberately do NOT advise `org-agenda' to do this — scoped commands
 let-bind `org-agenda-files', and an advice would clobber that binding."
   (setq org-agenda-files (my/org-agenda-files-all)))
-
-(my/org-agenda-refresh-files)
 
 ;; ---- Commands ---------------------------------------------------
 
@@ -174,8 +175,6 @@ Each project gets its single-letter slug key (see
    ("p" "Project TODOs..."    my/org-agenda-project-transient)]
   ["Raw"
    ("d" "Dispatcher"          my/org-agenda-dispatch)])
-
-(global-set-key (kbd "C-c a") #'my/org-agenda-transient)
 
 (provide 'my-org-agenda)
 ;;; my-org-agenda.el ends here

@@ -867,15 +867,64 @@ I don't fully use this right now. Perhaps I should.
 #+RESULTS:
 
 * org-mode setup
-** org-capture setup
-   The implementation lives in =lisp/my-org-capture.el= — see that file
-   for category templates, project support, the current-project
-   concept, refile setup, and the =C-<return>= timestamp helper in Raw
-   notes sections. Stow links that file into =~/.emacs.d/lisp/= which
-   is already on the =load-path=.
+** org-capture / org-agenda
+   The machinery is split across a handful of modules in
+   =lisp/= (stow symlinks them into =~/.emacs.d/lisp/=, which is already
+   on the =load-path=):
+
+   - =my-org-core.el= — shared categories, project paths, index reader,
+     file-set helpers.
+   - =my-org-projects.el= — project CRUD, current-project state, letter
+     allocator, modeline segment, project transient.
+   - =my-org-capture.el= — category/project/current-project capture
+     templates and the Raw-notes =C-<return>= helper.
+   - =my-org-agenda.el= — agenda file sets, commands, and transient.
+
+   Each module defines functions and variables only. All invocation —
+   keybindings, hooks, advice, refile config, modeline install, state
+   load, agenda file set — is wired up below so you can see the whole
+   shape in one place.
 
    #+BEGIN_SRC emacs-lisp
+     (require 'my-org-core)
+     (require 'my-org-projects)
      (require 'my-org-capture)
      (require 'my-org-agenda)
+
+     ;; Restore the persisted "current project" slug.
+     (my/org-current-project-load)
+
+     ;; Modeline segment showing the current project.
+     (unless (memq 'my/org-current-project-mode-line-segment
+                   mode-line-misc-info)
+       (add-to-list 'mode-line-misc-info
+                    'my/org-current-project-mode-line-segment t))
+
+     ;; Refile targets reach every capture file + active project root.
+     (setq org-refile-targets '((my/org-category-files :maxlevel . 3))
+           org-refile-use-outline-path 'file
+           org-outline-path-complete-in-steps nil)
+
+     ;; Build the agenda file set once at startup; scoped commands
+     ;; let-bind their own.
+     (my/org-agenda-refresh-files)
+
+     ;; Keybindings.
+     (global-set-key (kbd "C-c c") #'org-capture)
+     (global-set-key (kbd "C-c a") #'my/org-agenda-transient)
+     (global-set-key (kbd "M-j")   #'my/org-project-transient)
+
+     ;; Rebuild capture templates right before each capture, and once
+     ;; org loads so the first C-c c already has them.
+     (advice-add 'org-capture :before #'my/org-rebuild-capture-templates)
+
+     (with-eval-after-load 'org
+       (my/org-rebuild-capture-templates)
+       (define-key org-mode-map (kbd "C-<return>")
+                   #'my/org-timestamped-item-or-heading))
+
+     (with-eval-after-load 'org-capture
+       (define-key org-capture-mode-map (kbd "C-<return>")
+                   #'my/org-timestamped-item-or-heading))
    #+END_SRC
 
