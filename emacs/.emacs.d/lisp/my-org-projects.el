@@ -291,19 +291,36 @@ When invoked inside a git repo, also offers to persist the current
       (user-error "No projects yet"))
     (find-file index)))
 
+(defun my/org-project--file-for-kind (slug kind)
+  "Return SLUG's file for KIND (`root' or `whiteboard')."
+  (pcase kind
+    ('root       (my/org-project-root-file slug))
+    ('whiteboard (my/org-project-whiteboard-file slug))
+    (_ (error "Unknown project file kind: %S" kind))))
+
+(defun my/org-project--read-goto-kind ()
+  "Read `[r]oot' or `[w]hiteboard'. Returns the kind symbol."
+  (pcase (read-char-choice "File: [r]oot [w]hiteboard: " '(?r ?w))
+    (?r 'root)
+    (?w 'whiteboard)))
+
 (defun my/org-project-goto ()
-  "Pick an active project and open its root.org."
+  "Pick an active project and open one of its files.
+Prompts for the slug, then reads `[r]oot' or `[w]hiteboard' to
+decide which file to open."
   (interactive)
   (let ((slugs (my/org-project-active-slugs)))
     (unless slugs
       (user-error "No active projects"))
-    (let ((slug (completing-read "Go to project: " slugs nil t)))
-      (find-file (my/org-project-root-file slug)))))
+    (let* ((slug (completing-read "Go to project: " slugs nil t))
+           (kind (my/org-project--read-goto-kind)))
+      (find-file (my/org-project--file-for-kind slug kind)))))
 
 (defun my/org-project-goto-all ()
-  "Pick any project (active or archived) and open its root.org.
+  "Pick any project (active or archived) and open one of its files.
 Archived entries are annotated so you can distinguish them in the
-completion list."
+completion list. Reads `[r]oot' or `[w]hiteboard' after picking the
+slug."
   (interactive)
   (let* ((projects (my/org-project--read-index))
          (_ (unless projects (user-error "No projects")))
@@ -318,8 +335,9 @@ completion list."
                     "")))
          (completion-extra-properties
           (list :annotation-function annot))
-         (slug (completing-read "Go to project (all): " candidates nil t)))
-    (find-file (my/org-project-root-file slug))))
+         (slug (completing-read "Go to project (all): " candidates nil t))
+         (kind (my/org-project--read-goto-kind)))
+    (find-file (my/org-project--file-for-kind slug kind))))
 
 (defun my/org-goto-toplevel-file ()
   "Pick a category-based top-level org file and open it."
@@ -447,26 +465,26 @@ none is set. Does not change `my/org-current-project'."
 
 (transient-define-prefix my/org-project-transient ()
   "Manage org-capture projects, clocks, and jumps."
-  ["Projects"
-   ("g" "Goto active"         my/org-project-goto)
-   ("G" "Goto all"            my/org-project-goto-all)
-   ("n" "New project"         my/org-project-new)
-   ("a" "Archive project"     my/org-project-archive)
-   ("l" "List (open index)"   my/org-project-list)]
-  ["Current project"
-   ("s" "Set current"         my/org-project-set-current)
-   ("c" "Clear current"       my/org-project-clear-current)]
-  ["Clock"
-   ("i" "Clock in"            my/org-project-clock-in)
-   ("o" "Clock out"           my/org-project-clock-out)
-   ("I" "Clock in last"       my/org-project-clock-in-last)
-   ("j" "Goto clock"          my/org-project-clock-goto)]
-  ["Mappings"
-   ("M" "Map current repo"    my/org-project-mapping-add-here)
-   ("R" "Unmap current repo"  my/org-project-mapping-remove-here)
-   ("T" "Toggle autoswitch"   my/org-project-autoswitch-mode)]
-  ["Goto file"
-   ("f" "Top-level org file"  my/org-goto-toplevel-file)])
+  [["Projects"
+    ("g" "Goto active"         my/org-project-goto)
+    ("G" "Goto all"            my/org-project-goto-all)
+    ("n" "New project"         my/org-project-new)
+    ("a" "Archive project"     my/org-project-archive)
+    ("l" "List (open index)"   my/org-project-list)]
+   ["Current project"
+    ("s" "Set current"         my/org-project-set-current)
+    ("c" "Clear current"       my/org-project-clear-current)]]
+  [["Clock"
+    ("i" "Clock in"            my/org-project-clock-in)
+    ("o" "Clock out"           my/org-project-clock-out)
+    ("I" "Clock in last"       my/org-project-clock-in-last)
+    ("j" "Goto clock"          my/org-project-clock-goto)]
+   ["Mappings"
+    ("M" "Map current repo"    my/org-project-mapping-add-here)
+    ("R" "Unmap current repo"  my/org-project-mapping-remove-here)
+    ("T" "Toggle autoswitch"   my/org-project-autoswitch-mode)]]
+  [["Goto file"
+    ("f" "Top-level org file"  my/org-goto-toplevel-file)]])
 
 (provide 'my-org-projects)
 ;;; my-org-projects.el ends here

@@ -45,7 +45,9 @@ mapping layer.
   (active only), `my/org-project-goto-all` (includes archived, with
   `[archived]` annotation in the completion list),
   `my/org-project-set-current`, `my/org-project-clear-current`,
-  `my/org-goto-toplevel-file`.
+  `my/org-goto-toplevel-file`. Both goto commands read `[r]oot` or
+  `[w]hiteboard` after picking a slug, so `jXw`-style capture and
+  direct navigation share one entry point.
 - Clocking: `my/org-project-clock-in` (clocks in on the `* <slug>`
   heading in `projects/index.org`, defaulting to the current project
   and prompting if unset), `my/org-project-clock-out`,
@@ -164,8 +166,8 @@ minimal modeline format used system-wide.
 
 | Column           | Key | Command                               |
 |------------------|-----|---------------------------------------|
-| Projects         | `g` | `my/org-project-goto` (active only)   |
-|                  | `G` | `my/org-project-goto-all` (incl. archived) |
+| Projects         | `g` | `my/org-project-goto` (active only, then `[r]oot`/`[w]hiteboard`) |
+|                  | `G` | `my/org-project-goto-all` (incl. archived, same kind prompt) |
 |                  | `n` | `my/org-project-new`                  |
 |                  | `a` | `my/org-project-archive`              |
 |                  | `l` | `my/org-project-list` (open index)    |
@@ -209,7 +211,7 @@ carrying the full set of kinds from `my/org-capture-category`:
 | `d`    | Deadline        | `<cat>/inbox.org`                   |
 | `m`    | Meeting notes   | `<cat>/notes.org` (weekly datetree) |
 | `i`    | Interview notes | `<cat>/notes.org` (weekly datetree) |
-| `w`    | Whiteboard      | `<cat>/whiteboard.org` (prepended)  |
+| `w`    | Whiteboard      | `<cat>/whiteboard.org` (daily datetree, `HH:MM` headline, cursor in body) |
 | `x`    | Miscellaneous   | `<cat>/inbox.org` under *Miscellaneous* |
 
 Project-specific keys live under the `j` prefix:
@@ -260,14 +262,17 @@ templates under `j`/`.` target these by headline.
 
 ### `projects/<slug>/whiteboard.org`
 Freeform scratch file, seeded with just a `#+title:` line. Capture
-templates `jXw` and `.w` prepend timestamped entries. Created by
-`my/org-project-new`; for projects that predate the feature, the file
-is created lazily the first time something is captured into it.
+templates `jXw` and `.w` land in a daily datetree with an auto
+`HH:MM` headline — the cursor starts in the body so you can just
+begin typing. Created by `my/org-project-new`; for projects that
+predate the feature, the file is created lazily the first time
+something is captured into it.
 
 ### `<category>/whiteboard.org`
 Analogous freeform scratch file at the category level, reached via the
 `w` suffix under the category prefix (e.g. `ww` for Work whiteboard).
-Created lazily by org-capture on first use.
+Same daily-datetree + auto-`HH:MM`-headline shape as the project
+whiteboards. Created lazily by org-capture on first use.
 
 ### `my/org-interview-property`
 Subtree property `:INTERVIEW_MODE: t`, written by the interview capture

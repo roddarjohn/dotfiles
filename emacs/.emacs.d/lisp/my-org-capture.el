@@ -75,8 +75,8 @@ nil means all of them. Valid kinds:
             :tree-type week))
          ('whiteboard
           `(,(concat key "w") "Whiteboard" entry
-            (file ,whiteboard)
-            "* %?\n%U\n" :prepend t))
+            (file+olp+datetree ,whiteboard)
+            "* %<%H:%M>\n%?\n" :prepend t))
          ('miscellaneous
           `(,(concat key "x") "Miscellaneous" entry
             (file+headline ,inbox "Miscellaneous")
@@ -101,8 +101,8 @@ nil means all of them. Valid kinds:
      (file+headline ,root "Pointers")
      "* %?\n%a\n%U\n")
    `(,(concat prefix "w") "Whiteboard" entry
-     (file ,whiteboard)
-     "* %?\n%U\n" :prepend t)))
+     (file+olp+datetree ,whiteboard)
+     "* %<%H:%M>\n%?\n" :prepend t)))
 
 (defun my/org-capture-project-templates ()
   "Return capture entries for every active project under the `j' prefix.
@@ -154,8 +154,8 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
          (file+headline ,root "Pointers")
          "* %?\n%a\n%U\n")
         (".w" "Whiteboard" entry
-         (file ,whiteboard)
-         "* %?\n%U\n" :prepend t)))))
+         (file+olp+datetree ,whiteboard)
+         "* %<%H:%M>\n%?\n" :prepend t)))))
 
 ;; ---- Dynamic rebuild --------------------------------------------
 
