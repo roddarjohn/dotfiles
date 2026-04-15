@@ -88,14 +88,17 @@ so we don't depend on full org-mode setup in a temp buffer."
 
 (defun my/org-toplevel-file-alist ()
   "Return ((LABEL . PATH) ...) for the category-based capture files.
-Includes the shared top-level inbox and each category's
-journal/inbox/notes files, whether or not they exist on disk."
+Includes the shared top-level inbox and journal and each category's
+inbox/notes/whiteboard files, whether or not they exist on disk."
   (let ((entries (list (cons "inbox"
                              (expand-file-name
-                              "~/org/src/orgfiles/inbox.org")))))
+                              "~/org/src/orgfiles/inbox.org"))
+                       (cons "journal"
+                             (expand-file-name
+                              "~/org/src/orgfiles/journal.org")))))
     (dolist (cat my/org-capture-categories)
       (let ((subdir (nth 2 cat)))
-        (dolist (name '("journal" "inbox" "notes" "whiteboard"))
+        (dolist (name '("inbox" "notes" "whiteboard"))
           (push (cons (format "%s/%s" subdir name)
                       (expand-file-name
                        (format "~/org/src/orgfiles/%s/%s.org" subdir name)))
@@ -104,14 +107,15 @@ journal/inbox/notes files, whether or not they exist on disk."
 
 (defun my/org-category-files ()
   "Every org file reachable from the capture setup.
-Includes the shared top-level inbox.org, per-category
-journal/inbox/notes files, and every active project's root.org so
-refile can reach them."
-  (let ((files (list (expand-file-name "~/org/src/orgfiles/inbox.org"))))
+Includes the shared top-level inbox.org and journal.org, per-category
+inbox/notes/whiteboard files, and every active project's root and
+whiteboard so refile can reach them."
+  (let ((files (list (expand-file-name "~/org/src/orgfiles/inbox.org")
+                     (expand-file-name "~/org/src/orgfiles/journal.org"))))
     (dolist (cat my/org-capture-categories)
       (let* ((subdir (nth 2 cat))
              (dir (format "~/org/src/orgfiles/%s/" subdir)))
-        (dolist (name '("journal.org" "inbox.org" "notes.org" "whiteboard.org"))
+        (dolist (name '("inbox.org" "notes.org" "whiteboard.org"))
           (push (expand-file-name (concat dir name)) files))))
     (dolist (slug (my/org-project-active-slugs))
       (push (my/org-project-root-file slug) files)

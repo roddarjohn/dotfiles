@@ -32,19 +32,16 @@ the capture menu. SUBDIR is the sub-directory under
 ~/org/src/orgfiles/ (nil puts the files directly under it).
 KINDS is a list of symbols selecting which sub-templates to build;
 nil means all of them. Valid kinds:
-  thought       -> <subdir>/journal.org
-  journal       -> <subdir>/journal.org (datetree)
   deadline      -> <subdir>/inbox.org
   meeting       -> <subdir>/notes.org (weekly datetree)
   interview     -> <subdir>/notes.org (weekly datetree)
-  whiteboard    -> <subdir>/whiteboard.org (prepended)
+  whiteboard    -> <subdir>/whiteboard.org (daily datetree)
   miscellaneous -> <subdir>/inbox.org (Miscellaneous heading)"
-  (let* ((all '(thought journal deadline meeting interview whiteboard miscellaneous))
+  (let* ((all '(deadline meeting interview whiteboard miscellaneous))
          (kinds (or kinds all))
          (dir (if subdir
                   (format "~/org/src/orgfiles/%s/" subdir)
                 "~/org/src/orgfiles/"))
-         (journal (concat dir "journal.org"))
          (inbox (concat dir "inbox.org"))
          (notes (concat dir "notes.org"))
          (whiteboard (concat dir "whiteboard.org"))
@@ -52,14 +49,6 @@ nil means all of them. Valid kinds:
     (dolist (kind kinds)
       (push
        (pcase kind
-         ('thought
-          `(,(concat key "t") "Thought" entry
-            (file ,journal)
-            "* %?\n%U\n"))
-         ('journal
-          `(,(concat key "j") "Journal" entry
-            (file+olp+datetree ,journal)
-            "* %?\n%U\n"))
          ('deadline
           `(,(concat key "d") "Deadline" entry
             (file ,inbox)
@@ -167,7 +156,10 @@ free letter can be assigned, a letter shortcut (`jm', `jt', ...)."
                  my/org-capture-categories)
          (my/org-capture-project-templates)
          (my/org-current-project-capture-templates)
-         '(("x" "Miscellaneous" entry
+         '(("J" "Journal" entry
+            (file+olp+datetree "~/org/src/orgfiles/journal.org")
+            "* %?\n")
+           ("x" "Miscellaneous" entry
             (file+headline "~/org/src/orgfiles/inbox.org" "To file")
             "* %?\n%U\n")))))
 

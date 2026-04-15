@@ -99,8 +99,9 @@ Capture template builders and the current-project capture entry point.
 
 - `my/org-capture-category` — builds a capture group from a
   `(KEY NAME SUBDIR)` tuple plus an optional list of `kinds`
-  (`thought`, `journal`, `deadline`, `meeting`, `interview`,
-  `whiteboard`, `miscellaneous`).
+  (`deadline`, `meeting`, `interview`, `whiteboard`, `miscellaneous`).
+  Journaling is intentionally not a per-category kind — there is a
+  single top-level `~/org/src/orgfiles/journal.org` reached via `J`.
 - `my/org-capture-project-templates` — generates `j`-prefixed templates
   for every active project, both digit slots (`j1`…`j9`) and single-
   letter shortcuts where available. Each group carries todo/reference/
@@ -206,8 +207,6 @@ carrying the full set of kinds from `my/org-capture-category`:
 
 | Suffix | Kind            | Target                              |
 |--------|-----------------|-------------------------------------|
-| `t`    | Thought         | `<cat>/journal.org`                 |
-| `j`    | Journal         | `<cat>/journal.org` (daily datetree)|
 | `d`    | Deadline        | `<cat>/inbox.org`                   |
 | `m`    | Meeting notes   | `<cat>/notes.org` (weekly datetree) |
 | `i`    | Interview notes | `<cat>/notes.org` (weekly datetree) |
@@ -234,11 +233,12 @@ The current project is reachable under the `.` prefix:
 | `.p` | Pointer in the current project                      |
 | `.w` | Whiteboard entry in the current project              |
 
-Top-level catch-all:
+Top-level catch-alls:
 
-| Key | What it opens                                       |
-|-----|-----------------------------------------------------|
-| `x` | Miscellaneous → `~/org/src/orgfiles/inbox.org` *To file* |
+| Key | What it opens                                                       |
+|-----|---------------------------------------------------------------------|
+| `J` | Journal → `~/org/src/orgfiles/journal.org` (daily datetree)         |
+| `x` | Miscellaneous → `~/org/src/orgfiles/inbox.org` *To file*            |
 
 ## Storage conventions
 
