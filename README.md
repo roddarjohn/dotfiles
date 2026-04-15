@@ -2,6 +2,25 @@
 
 Configuration files for my machines, managed with [GNU Stow](https://www.gnu.org/software/stow/).
 
+## Quick start (fresh machine)
+
+```bash
+git clone https://github.com/roddarjohn/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./bootstrap.sh
+```
+
+`bootstrap.sh` automates everything under Prerequisites and Install below:
+apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
+running `install.sh`, and (optionally, with prompts) installing
+`jsonnet-language-server` and `syncthing`. Each phase is idempotent, so
+re-running is safe. Expect ~1 hour on a fresh machine (most of it
+waiting on the Emacs build).
+
+The rest of this README is the manual breakdown of what `bootstrap.sh`
+does — read it if you want to run individual steps yourself or
+understand what's being installed.
+
 ## Prerequisites
 
 Install these before running the install script:
