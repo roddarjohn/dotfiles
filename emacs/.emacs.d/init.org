@@ -876,6 +876,9 @@ I don't fully use this right now. Perhaps I should.
     (keymap-set eglot-mode-map "C-c h"   #'eglot-inlay-hints-mode)
     (keymap-set eglot-mode-map "C-c l"   #'my/eglot-transient))
 
+  (add-hook 'eglot-managed-mode-hook
+            (lambda () (eglot-inlay-hints-mode -1)))
+
   (add-hook 'python-mode-hook 'eglot-ensure)
   (add-hook 'python-ts-mode-hook 'eglot-ensure)
 #+end_src
