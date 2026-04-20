@@ -839,29 +839,46 @@ I don't fully use this right now. Perhaps I should.
 * eglot setup
 ** eglot
 #+begin_src emacs-lisp
+  (require 'transient)
+
+  (transient-define-prefix my/eglot-transient ()
+    "Dispatcher for eglot commands (LSP features, refactors, server admin)."
+    [["Navigate"
+      ("t" "Type definition"  eglot-find-typeDefinition)
+      ("i" "Implementation"   eglot-find-implementation)
+      ("d" "Declaration"      eglot-find-declaration)]
+     ["Refactor"
+      ("r" "Rename"           eglot-rename)
+      ("a" "Code actions"     eglot-code-actions)
+      ("o" "Organize imports" eglot-code-action-organize-imports)
+      ("q" "Quick fix"        eglot-code-action-quickfix)
+      ("x" "Extract"          eglot-code-action-extract)
+      ("w" "Rewrite"          eglot-code-action-rewrite)
+      ("n" "Inline"           eglot-code-action-inline)]]
+    [["Toggle / info"
+      ("h" "Inlay hints mode" eglot-inlay-hints-mode)
+      ("c" "Show config"      eglot-show-workspace-configuration)]
+     ["Server"
+      ("R" "Reconnect"        eglot-reconnect)
+      ("S" "Shutdown"         eglot-shutdown)
+      ("E" "Events buffer"    eglot-events-buffer)
+      ("L" "Stderr buffer"    eglot-stderr-buffer)]])
+
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  	         '((python-mode python-ts-mode) . ("uvx" "--with" "ty" "ty" "server")))
+  	         '((python-mode python-ts-mode) . ("uvx" "zuban" "server")))
     (add-to-list 'eglot-server-programs
                  '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
-    (keymap-set eglot-mode-map "C-c j" #'eglot-code-actions))
+    (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
+    (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
+    (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)
+    (keymap-set eglot-mode-map "C-c i"   #'eglot-find-implementation)
+    (keymap-set eglot-mode-map "C-c h"   #'eglot-inlay-hints-mode)
+    (keymap-set eglot-mode-map "C-c l"   #'my/eglot-transient))
 
   (add-hook 'python-mode-hook 'eglot-ensure)
-  (add-hook 'python-ts-mode-hook 'eglot-ensure)  
-
-  (setq-default eglot-workspace-configuration
-  	      '((:ty . (
-  			 :inlayHints
-  			 (
-  			  :variableTypes :json-false
-  					 :callArgumentNames :json-false
-  					 )))))
-  					 
-  					  
+  (add-hook 'python-ts-mode-hook 'eglot-ensure)
 #+end_src
-
-#+RESULTS:
-| :ty | :inlayHints | (:variableTypes :json-false :callArgumentNames :json-false) |
 ** copilot
 #+begin_src emacs-lisp
   (use-package copilot
