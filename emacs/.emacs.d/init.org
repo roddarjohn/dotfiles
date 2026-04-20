@@ -35,7 +35,25 @@
     (load bootstrap-file nil 'nomessage))
 
   (setq straight-use-package-by-default t)
-  (straight-pull-recipe-repositories)
+
+  ;; Pull recipe repositories only on a clean install — i.e. when at
+  ;; least one of the recipe repos hasn't been cloned yet. On an
+  ;; existing install this is a no-op, so startup stays fast.
+  ;; `org-elpa' is built into straight.el and has no cloned repo, so
+  ;; it's excluded from the check.
+  (defun my/straight--recipe-repos-ready-p ()
+    (let ((repos-dir (expand-file-name
+                      "straight/repos/"
+                      (or (bound-and-true-p straight-base-dir)
+                          user-emacs-directory))))
+      (seq-every-p
+       (lambda (name)
+         (file-directory-p
+          (expand-file-name (symbol-name name) repos-dir)))
+       (remq 'org-elpa straight-recipe-repositories))))
+
+  (unless (my/straight--recipe-repos-ready-p)
+    (straight-pull-recipe-repositories))
 #+end_src
 
 ** load-path
@@ -750,7 +768,7 @@ I don't fully use this right now. Perhaps I should.
   (setq mu4e-confirm-quit nil)
 #+end_src
 
-* Python
+* python
 ** ruff on save
 #+begin_src emacs-lisp
   (defun ruff-format-buffer ()
