@@ -23,12 +23,15 @@
 (declare-function org-clock-in-last "org-clock")
 (declare-function org-clocking-p "org-clock")
 
-(defconst my/org-project-root-template
+(defvar my/org-project-root-template
   "#+title: %s\n#+category: %s\n\n* Tasks\n* Reference\n* Pointers\n"
   "Seed written into a new project's root.org.
-Receives the slug twice (title then category).")
+Receives the slug twice (title then category). The headings here
+should cover every `file+headline' target referenced by
+`my/org-project-capture-kinds' — edit both together if you add or
+rename a per-project kind.")
 
-(defconst my/org-project-whiteboard-template
+(defvar my/org-project-whiteboard-template
   "#+title: %s whiteboard\n#+category: %s\n\n"
   "Seed written into a new project's whiteboard.org.
 Receives the slug twice (title then category).")

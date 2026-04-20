@@ -3,9 +3,11 @@
 ;; Agenda on top of the capture layout defined across `my-org-core' and
 ;; `my-org-projects'.
 ;;
-;; Agenda file scope: the top-level inbox, each <category>/inbox.org, and
-;; every active project's root.org. Journals and notes are excluded to
-;; keep the view focused on actual tasks.
+;; Agenda file scope: the top-level inbox, each category's
+;; TODO-bearing files (derived from `my/org-capture-category-kinds' —
+;; specifically kinds whose target is not a datetree), and every
+;; active project's root.org. Datetree'd notes and whiteboards are
+;; excluded so the view stays focused on actual tasks.
 ;;
 ;; Entry point: `my/org-agenda-transient' offers an "everything" view, a
 ;; category picker, and a project picker. The raw org-agenda dispatcher
@@ -21,25 +23,51 @@
 (require 'my-org-core)
 (require 'my-org-projects)
 
+(defconst my/org-agenda--todo-target-types
+  '(file file+headline file+regexp)
+  "Target types that produce agenda-relevant (TODO-bearing) captures.
+Datetree types are excluded — those kinds file time-series notes or
+whiteboards, not tasks.")
+
 ;; ---- File-set helpers -------------------------------------------
 
-(defun my/org-agenda--category-inbox (subdir)
-  (expand-file-name (format "~/org/src/orgfiles/%s/inbox.org" subdir)))
+(defun my/org-agenda--category-file-names ()
+  "Distinct filenames from `my/org-capture-category-kinds' whose
+targets are TODO-bearing (see `my/org-agenda--todo-target-types')."
+  (let (files)
+    (dolist (cell my/org-capture-category-kinds)
+      (let* ((spec (cdr cell))
+             (target (plist-get spec :target))
+             (type (car-safe target))
+             (file (my/org-capture-kind-file spec)))
+        (when (and file
+                   (memq type my/org-agenda--todo-target-types)
+                   (not (member file files)))
+          (push file files))))
+    (nreverse files)))
+
+(defun my/org-agenda--category-files (subdir)
+  "Return the agenda-relevant files in category SUBDIR."
+  (let ((dir (my/org-category-dir subdir)))
+    (mapcar (lambda (name) (expand-file-name name dir))
+            (my/org-agenda--category-file-names))))
 
 (defun my/org-agenda-files-all ()
   "Return every agenda-relevant org file.
-Includes the top-level inbox, per-category inboxes, and every active
-project root. Journals and notes are intentionally excluded."
-  (let ((files (list (expand-file-name "~/org/src/orgfiles/inbox.org"))))
+Includes the top-level inbox, each category's agenda files, and
+every active project root. Notes and whiteboards are intentionally
+excluded."
+  (let ((files (list (my/org-toplevel-file "inbox.org"))))
     (dolist (cat my/org-capture-categories)
-      (push (my/org-agenda--category-inbox (nth 2 cat)) files))
+      (dolist (f (my/org-agenda--category-files (nth 2 cat)))
+        (push f files)))
     (dolist (slug (my/org-project-active-slugs))
       (push (my/org-project-root-file slug) files))
     (nreverse files)))
 
 (defun my/org-agenda-files-for-category (subdir)
-  "Agenda file list scoped to category SUBDIR (its inbox)."
-  (list (my/org-agenda--category-inbox subdir)))
+  "Agenda file list scoped to category SUBDIR."
+  (my/org-agenda--category-files subdir))
 
 (defun my/org-agenda-files-for-project (slug)
   "Agenda file list scoped to a single project SLUG."

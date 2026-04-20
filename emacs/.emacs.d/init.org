@@ -39,14 +39,9 @@
 #+end_src
 
 ** load-path
-This is really not used anymore, but could be if I want to include
-specific lisp code. Just put the code in the dotfiles repo and then
-it'd be tracked.
-
 #+begin_src emacs-lisp
   (add-to-list 'load-path "~/.emacs.d/lisp/")
 #+end_src
-
 * Base setup
 ** global
 #+begin_src emacs-lisp
@@ -867,76 +862,194 @@ I don't fully use this right now. Perhaps I should.
 #+RESULTS:
 
 * org-mode setup
-** org-capture / org-agenda
-   The machinery is split across a handful of modules in
-   =lisp/= (stow symlinks them into =~/.emacs.d/lisp/=, which is already
-   on the =load-path=):
+  The machinery lives in =lisp/my-org-*.el= (stow symlinks those into
+  =~/.emacs.d/lisp/=, which is already on the =load-path=). Those
+  files define machinery only; this section carries all the
+  user-facing configuration and wires everything up — categories,
+  capture kinds, keybindings, hooks, advice, refile/agenda config.
+  Each subsection =requires= the modules whose symbols it uses, so you
+  can read it locally without hunting elsewhere for loads.
 
-   - =my-org-core.el= — shared categories, project paths, index reader,
-     file-set helpers.
-   - =my-org-projects.el= — project CRUD, current-project state, repo
-     mappings, letter allocator, modeline segment, project transient.
-   - =my-org-capture.el= — category/project/current-project capture
-     templates, =my/org-project-capture= entry point, Raw-notes helper.
-   - =my-org-agenda.el= — agenda file sets, commands, and transient.
-   - =my-org-autoswitch.el= — global minor mode that tracks the current
-     project based on the selected buffer's git (repo, branch), plus
-     the modeline segment and minimal mode-line format.
-   - =my-org-interview.el= — interview capture template body and the
-     buffer-local =my/org-interview-mode= that rebinds =C-<return>=
-     inside =:RAW_NOTES:= subtrees.
+** categories
+   Top-level grouping for capture and agenda. =my/org-directory= is
+   the root under which per-category subdirectories live; each
+   category tuple is =(KEY NAME SUBDIR [KINDS])=, where an optional
+   =KINDS= list restricts the sub-templates built for that category
+   (nil/omitted = all kinds). The per-category file set for refile and
+   the goto menu is derived from the targets in
+   =my/org-capture-category-kinds= below, and the agenda file set is
+   the subset of those whose target is not a datetree.
 
-   Each module defines functions and variables only. All invocation —
-   keybindings, hooks, advice, refile config, modeline install, state
-   load, agenda file set — is wired up below so you can see the whole
-   shape in one place.
-
-   #+BEGIN_SRC emacs-lisp
+   #+begin_src emacs-lisp
      (require 'my-org-core)
-     (require 'my-org-projects)
-     (require 'my-org-interview)
+
+     (setq my/org-directory (expand-file-name "~/org/src/orgfiles/"))
+
+     (setq my/org-capture-categories
+           '(("w" "Work"     "work")
+             ("p" "Personal" "personal")
+             ("t" "Talos"    "talos")
+             ("d" "Debate"   "debate")))
+   #+end_src
+
+** capture kinds
+   The sub-templates built under each category's prefix
+   (=my/org-capture-category-kinds=), under each project's =j*=
+   prefix and the current-project =.= shortcut
+   (=my/org-project-capture-kinds=), and top-level extras appended
+   verbatim (=my/org-capture-extra-templates=).
+
+   In category targets, the file is a plain string resolved relative
+   to the category's subdir. In project targets, the file slot is the
+   symbol =root= or =whiteboard=, substituted for the active project's
+   files at build time. A =:body= that is a symbol is looked up via
+   =symbol-value= when the templates are built (that's how the
+   interview body is shared).
+
+   #+begin_src emacs-lisp
      (require 'my-org-capture)
-     (require 'my-org-agenda)
-     (require 'my-org-autoswitch)
+     (require 'my-org-interview)
 
-     ;; Restore the persisted "current project" slug.
+     (setq my/org-capture-category-kinds
+           `((deadline
+              :key "d" :desc "Deadline"
+              :target (file "inbox.org")
+              :body "* TODO %?\nDEADLINE: %^T\n%i\n"
+              :opts (:prepend t))
+             (meeting
+              :key "m" :desc "Meeting notes"
+              :target (file+olp+datetree "notes.org" "Meeting notes")
+              :body "* %?\n"
+              :opts (:tree-type week))
+             (interview
+              :key "i" :desc "Interview notes"
+              :target (file+olp+datetree "notes.org" "Interview notes")
+              :body my/org-interview-capture-template-body
+              :opts (:tree-type week))
+             (whiteboard
+              :key "w" :desc "Whiteboard"
+              :target (file+olp+datetree "whiteboard.org")
+              :body "* %<%H:%M>\n%?\n"
+              :opts (:prepend t))
+             (miscellaneous
+              :key "x" :desc "Miscellaneous"
+              :target (file+headline "inbox.org" "Miscellaneous")
+              :body "* %?\n%U\n")))
+
+     (setq my/org-project-capture-kinds
+           '((todo
+              :key "t" :desc "Todo"
+              :target (file+headline root "Tasks")
+              :body "* TODO %?\n%U\n"
+              :opts (:prepend t))
+             (reference
+              :key "r" :desc "Reference"
+              :target (file+headline root "Reference")
+              :body "* %?\n%U\n")
+             (pointer
+              :key "p" :desc "Pointer"
+              :target (file+headline root "Pointers")
+              :body "* %?\n%a\n%U\n")
+             (whiteboard
+              :key "w" :desc "Whiteboard"
+              :target (file+olp+datetree whiteboard)
+              :body "* %<%H:%M>\n%?\n"
+              :opts (:prepend t))))
+
+     (setq my/org-capture-extra-templates
+           '(("J" "Journal" entry
+              (file+olp+datetree "journal.org")
+              "* Entry - %<%H:%M>\n%?\n")
+             ("x" "Miscellaneous" entry
+              (file+headline "inbox.org" "To file")
+              "* %?\n%U\n")))
+   #+end_src
+
+** state
+   Restore the persisted "current project" slug from the state file so
+   the modeline segment and capture shortcuts come up correctly after
+   a restart.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-projects)
      (my/org-current-project-load)
+   #+end_src
 
-     ;; Minimal modeline: buffer name, line number, current project.
-     ;; Defined by `my-org-autoswitch' since that module owns the
-     ;; current-project concept surfaced here.
+** modeline
+   Minimal modeline: buffer name, line number, current project. The
+   format itself is defined in =my-org-autoswitch= since that module
+   owns the current-project concept surfaced here.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-autoswitch)
      (setq-default mode-line-format my/org-minimal-mode-line-format)
+   #+end_src
 
-     ;; Refile targets reach every capture file + active project root.
+** refile targets
+   Refile reaches every capture file plus each active project's
+   =root.org= / =whiteboard.org=.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-core)
      (setq org-refile-targets '((my/org-category-files :maxlevel . 3))
            org-refile-use-outline-path 'file
            org-outline-path-complete-in-steps nil)
+   #+end_src
 
-     ;; Build the agenda file set once at startup; scoped commands
-     ;; let-bind their own.
+** agenda files
+   Build the "everything" file set once at startup. Scoped agenda
+   commands let-bind their own =org-agenda-files=, so we deliberately
+   don't advise =org-agenda= to refresh.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-agenda)
      (my/org-agenda-refresh-files)
+   #+end_src
 
-     ;; Keybindings.
+** keybindings
+   =C-c c= is plain org-capture; =C-c a= / =C-c v= / =M-j= are the
+   transients / entry points built on top of it.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-agenda)
+     (require 'my-org-capture)
+     (require 'my-org-projects)
      (global-set-key (kbd "C-c c") #'org-capture)
      (global-set-key (kbd "C-c a") #'my/org-agenda-transient)
      (global-set-key (kbd "C-c v") #'my/org-project-capture)
      (global-set-key (kbd "M-j")   #'my/org-project-transient)
+   #+end_src
 
-     ;; Rebuild capture templates right before each capture, and once
-     ;; org loads so the first C-c c already has them.
+** capture templates
+   Rebuild =org-capture-templates= right before each capture (so new
+   projects / changed kinds are picked up), and once when org loads so
+   the first =C-c c= already has them.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-capture)
      (advice-add 'org-capture :before #'my/org-rebuild-capture-templates)
 
      (with-eval-after-load 'org
        (my/org-rebuild-capture-templates))
+   #+end_src
 
-     ;; Interview minor mode auto-enables in any org buffer that
-     ;; already contains RAW_NOTES subtrees (on-disk files), and in
-     ;; capture buffers once the template has been inserted.
+** interview mode
+   Auto-enable the interview minor mode in any org buffer that already
+   contains an =INTERVIEW_MODE= subtree (on-disk files), and in
+   capture buffers once the template has been inserted.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-interview)
      (add-hook 'org-mode-hook         #'my/org-interview-maybe-enable)
      (add-hook 'org-capture-mode-hook #'my/org-interview-maybe-enable)
+   #+end_src
 
-     ;; Auto-switch the current project based on the selected buffer's
-     ;; git (repo, branch) against mappings in projects/index.org.
+** project autoswitch
+   Auto-switch the current project based on the selected buffer's git
+   (repo, branch) against mappings recorded in =projects/index.org=.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-autoswitch)
      (my/org-project-autoswitch-mode 1)
-   #+END_SRC
+   #+end_src
 
