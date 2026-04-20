@@ -168,7 +168,7 @@ Each project gets its single-letter slug key (see
   [:description
    (lambda () (format "Category (%s)"
                       (if (equal my/org-agenda--category-view "a")
-                          "weekly agenda" "TODO list")))
+                          "Weekly agenda" "TODO list")))
    :class transient-column
    :setup-children my/org-agenda--category-children])
 
