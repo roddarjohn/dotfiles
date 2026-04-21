@@ -949,10 +949,10 @@ I don't fully use this right now. Perhaps I should.
      (require 'my-org-interview)
 
      (setq my/org-capture-category-kinds
-           `((deadline
-              :key "d" :desc "Deadline"
+           `((todo
+              :key "t" :desc "Todo item"
               :target (file "inbox.org")
-              :body "* TODO %?\nDEADLINE: %^T\n%i\n"
+              :body "* TODO %?\n%i\n"
               :opts (:prepend t))
              (meeting
               :key "m" :desc "Meeting notes"
@@ -1044,17 +1044,30 @@ I don't fully use this right now. Perhaps I should.
      (my/org-agenda-refresh-files)
    #+end_src
 
+** agenda deadline warnings
+   Only surface a deadline on its actual due date — no multi-day
+   pre-warning countdown cluttering today's view. And when an item
+   is both scheduled and deadlined, suppress the scheduled line so
+   only the deadline shows.
+
+   #+begin_src emacs-lisp
+     (setq org-deadline-warning-days 0
+           org-agenda-skip-scheduled-if-deadline-is-shown t)
+   #+end_src
+
 ** keybindings
-   =C-c c= is plain org-capture; =C-c a= / =C-c v= / =M-j= are the
-   transients / entry points built on top of it.
+   =C-c c= is plain org-capture; =C-c a= / =C-c v= / =C-c w= / =M-j=
+   are the transients / entry points built on top of it.
 
    #+begin_src emacs-lisp
      (require 'my-org-agenda)
      (require 'my-org-capture)
      (require 'my-org-projects)
+     (require 'my-org-refile)
      (global-set-key (kbd "C-c c") #'org-capture)
      (global-set-key (kbd "C-c a") #'my/org-agenda-transient)
      (global-set-key (kbd "C-c v") #'my/org-project-capture)
+     (global-set-key (kbd "C-c w") #'my/org-refile-dispatch)
      (global-set-key (kbd "M-j")   #'my/org-project-transient)
    #+end_src
 
