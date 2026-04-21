@@ -6,10 +6,12 @@
 ;; `my-org-projects' for writers and `my-org-core' for the parser).
 ;;
 ;; Behavior when the mode is on:
-;;   - Entering a buffer whose (repo, branch) maps to a project: switch
-;;     `my/org-current-project' to that project.
-;;   - Entering a buffer with no matching mapping: clear the current
-;;     project so the modeline and capture `.` menu reflect that.
+;;   - Entering a buffer whose file lives under an active project's
+;;     directory: switch to that project.
+;;   - Otherwise, if the buffer's (repo, branch) maps to a project:
+;;     switch `my/org-current-project' to that project.
+;;   - Entering a buffer with neither: clear the current project so
+;;     the modeline and capture `.` menu reflect that.
 ;;
 ;; The mode is defined here but NOT enabled by default — require and
 ;; enable it explicitly from init.org.
@@ -58,19 +60,21 @@ Install with
 
 ;; ---- Auto-switch state -----------------------------------------
 
-(defvar my/org-project-autoswitch--last-context 'unset
-  "Cached last (REPO . BRANCH) pair, or nil, or the symbol `unset'.
-Used to skip redundant lookups when nothing about the buffer's git
-context has changed.")
+(defvar my/org-project-autoswitch--last-key 'unset
+  "Cached last (FILE REPO BRANCH) tuple, or the symbol `unset'.
+Used to skip redundant lookups when nothing about the buffer's file
+or git context has changed.")
 
 (defun my/org-project-autoswitch--apply ()
-  "Set `my/org-current-project' from the selected buffer's git context."
-  (let ((ctx (ignore-errors (my/org-project-git-context))))
-    (unless (equal ctx my/org-project-autoswitch--last-context)
-      (setq my/org-project-autoswitch--last-context ctx)
-      (let ((slug (and ctx
-                       (my/org-project-find-by-context
-                        (car ctx) (cdr ctx)))))
+  "Set `my/org-current-project' from the selected buffer's org file or git context."
+  (let* ((file buffer-file-name)
+         (ctx (ignore-errors (my/org-project-git-context)))
+         (key (list file (car-safe ctx) (cdr-safe ctx))))
+    (unless (equal key my/org-project-autoswitch--last-key)
+      (setq my/org-project-autoswitch--last-key key)
+      (let ((slug (or (ignore-errors (my/org-project-from-buffer-file file))
+                      (and ctx (my/org-project-find-by-context
+                                (car ctx) (cdr ctx))))))
         (unless (equal slug my/org-current-project)
           (setq my/org-current-project slug)
           (my/org-current-project-save)
@@ -81,16 +85,17 @@ context has changed.")
 
 ;;;###autoload
 (define-minor-mode my/org-project-autoswitch-mode
-  "Toggle auto-switching of `my/org-current-project' based on git context.
-When enabled, selecting a buffer whose git (repo, branch) matches a
-mapping in index.org switches to that project; buffers with no
-matching mapping clear the current project."
+  "Toggle auto-switching of `my/org-current-project'.
+When enabled, selecting a buffer whose file is under an active
+project's directory switches to that project; otherwise, a buffer
+whose git (repo, branch) matches a mapping in index.org switches to
+that project. Buffers matching neither clear the current project."
   :global t
   :lighter nil
   :group 'org
   (if my/org-project-autoswitch-mode
       (progn
-        (setq my/org-project-autoswitch--last-context 'unset)
+        (setq my/org-project-autoswitch--last-key 'unset)
         (add-hook 'window-buffer-change-functions
                   #'my/org-project-autoswitch--hook)
         (add-hook 'window-selection-change-functions
@@ -100,7 +105,7 @@ matching mapping clear the current project."
                  #'my/org-project-autoswitch--hook)
     (remove-hook 'window-selection-change-functions
                  #'my/org-project-autoswitch--hook)
-    (setq my/org-project-autoswitch--last-context 'unset)))
+    (setq my/org-project-autoswitch--last-key 'unset)))
 
 (provide 'my-org-autoswitch)
 ;;; my-org-autoswitch.el ends here

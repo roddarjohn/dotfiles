@@ -120,6 +120,22 @@ Splits on the rightmost `@' so repo paths containing `@' still parse."
       (format "%s@%s" repo branch)
     repo))
 
+(defun my/org-project-from-buffer-file (&optional file)
+  "Return the active project slug whose directory contains FILE, or nil.
+FILE defaults to `buffer-file-name'. Only active projects match;
+files under archived projects return nil."
+  (let ((file (and (or file buffer-file-name)
+                   (expand-file-name (or file buffer-file-name)))))
+    (when file
+      (let ((projects-dir (file-name-as-directory
+                           (expand-file-name (my/org-projects-dir)))))
+        (when (string-prefix-p projects-dir file)
+          (let* ((rel (substring file (length projects-dir)))
+                 (slug (car (split-string rel "/" t))))
+            (and slug
+                 (member slug (my/org-project-active-slugs))
+                 slug)))))))
+
 (defun my/org-project-find-by-context (repo branch)
   "Return the active project slug matching REPO and BRANCH, or nil.
 A bare REPO mapping matches any branch; a REPO@BRANCH mapping must
@@ -319,6 +335,15 @@ decide which file to open."
            (kind (my/org-project--read-goto-kind)))
       (find-file (my/org-project--file-for-kind slug kind)))))
 
+(defun my/org-project-goto-current ()
+  "Open the current project's root or whiteboard file."
+  (interactive)
+  (unless my/org-current-project
+    (user-error "No current project"))
+  (find-file (my/org-project--file-for-kind
+              my/org-current-project
+              (my/org-project--read-goto-kind))))
+
 (defun my/org-project-goto-all ()
   "Pick any project (active or archived) and open one of its files.
 Archived entries are annotated so you can distinguish them in the
@@ -476,7 +501,8 @@ none is set. Does not change `my/org-current-project'."
     ("l" "List (open index)"   my/org-project-list)]
    ["Current project"
     ("s" "Set current"         my/org-project-set-current)
-    ("c" "Clear current"       my/org-project-clear-current)]]
+    ("c" "Clear current"       my/org-project-clear-current)
+    ("." "Goto current"        my/org-project-goto-current)]]
   [["Clock"
     ("i" "Clock in"            my/org-project-clock-in)
     ("o" "Clock out"           my/org-project-clock-out)
