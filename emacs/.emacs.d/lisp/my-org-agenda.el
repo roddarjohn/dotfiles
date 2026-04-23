@@ -73,6 +73,33 @@ excluded."
   "Agenda file list scoped to a single project SLUG."
   (list (my/org-project-root-file slug)))
 
+;; ---- Prefix-format label ---------------------------------------
+;;
+;; `org-agenda-prefix-format' evaluates %(sexp) while the source org
+;; buffer is current, so `buffer-file-name' here points at the entry's
+;; origin file. We derive the label from the path rather than from
+;; `#+CATEGORY:' lines so the on-disk files stay unannotated.
+
+(defun my/org-agenda-entry-label ()
+  "Label showing the category or project an agenda entry comes from.
+Returns \"[<category>]\" for entries under a category subdir,
+\"[proj:<slug>]\" for entries under projects/<slug>/, and
+\"[<filename>]\" for top-level files (e.g. inbox.org)."
+  (let* ((file (or (buffer-file-name (buffer-base-buffer))
+                   (buffer-file-name)))
+         (rel (and file my/org-directory
+                   (file-relative-name file my/org-directory))))
+    (cond
+     ((null rel) "")
+     ((string-match "\\`projects/\\([^/]+\\)/" rel)
+      (format "[proj:%s]" (match-string 1 rel)))
+     ((string-match "\\`\\([^/]+\\)/" rel)
+      (let* ((subdir (match-string 1 rel))
+             (cat (seq-find (lambda (c) (equal (nth 2 c) subdir))
+                            my/org-capture-categories)))
+        (format "[%s]" (downcase (if cat (nth 1 cat) subdir)))))
+     (t (format "[%s]" (file-name-base rel))))))
+
 (defun my/org-agenda-refresh-files ()
   "Rebuild `org-agenda-files' from the capture layout.
 Called explicitly from entry points that want the \"everything\" view.

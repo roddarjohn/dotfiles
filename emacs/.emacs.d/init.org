@@ -836,6 +836,75 @@ I don't fully use this right now. Perhaps I should.
     :hook (jsonnet-mode . eglot-ensure))
 #+end_src
 
+* jinja2 templates (polymode)
+#+begin_src emacs-lisp
+  (use-package jinja2-mode
+    :defer t)
+
+  (use-package polymode
+    :mode (("\\.py\\.j2\\'"  . poly-python-j2-mode)
+           ("\\.jsx\\.j2\\'" . poly-jsx-j2-mode)
+           ("\\.tsx\\.j2\\'" . poly-tsx-j2-mode)
+           ("\\.js\\.j2\\'"  . poly-js-j2-mode))
+    :config
+    (define-innermode poly-jinja2-expr-innermode
+      :mode 'jinja2-mode
+      :head-matcher "{{"
+      :tail-matcher "}}"
+      :head-mode 'body
+      :tail-mode 'body)
+    (define-innermode poly-jinja2-stmt-innermode
+      :mode 'jinja2-mode
+      :head-matcher "{%"
+      :tail-matcher "%}"
+      :head-mode 'body
+      :tail-mode 'body)
+    (define-innermode poly-jinja2-comment-innermode
+      :mode 'jinja2-mode
+      :head-matcher "{#"
+      :tail-matcher "#}"
+      :head-mode 'body
+      :tail-mode 'body)
+
+    (define-hostmode poly-python-j2-hostmode :mode 'python-ts-mode)
+    (define-hostmode poly-jsx-j2-hostmode    :mode 'tsx-ts-mode)
+    (define-hostmode poly-tsx-j2-hostmode    :mode 'tsx-ts-mode)
+    (define-hostmode poly-js-j2-hostmode     :mode 'js-ts-mode)
+
+    (define-polymode poly-python-j2-mode
+      :hostmode 'poly-python-j2-hostmode
+      :innermodes '(poly-jinja2-expr-innermode
+                    poly-jinja2-stmt-innermode
+                    poly-jinja2-comment-innermode))
+    (define-polymode poly-jsx-j2-mode
+      :hostmode 'poly-jsx-j2-hostmode
+      :innermodes '(poly-jinja2-expr-innermode
+                    poly-jinja2-stmt-innermode
+                    poly-jinja2-comment-innermode))
+    (define-polymode poly-tsx-j2-mode
+      :hostmode 'poly-tsx-j2-hostmode
+      :innermodes '(poly-jinja2-expr-innermode
+                    poly-jinja2-stmt-innermode
+                    poly-jinja2-comment-innermode))
+    (define-polymode poly-js-j2-mode
+      :hostmode 'poly-js-j2-hostmode
+      :innermodes '(poly-jinja2-expr-innermode
+                    poly-jinja2-stmt-innermode
+                    poly-jinja2-comment-innermode))
+
+    ;; The host file isn't valid Python/JS, so silence flymake and
+    ;; keep eglot from latching onto the buffer.
+    (defun my/poly-j2-quiet ()
+      (flymake-mode -1)
+      (setq-local eglot-stay-out-of '(flymake))
+      (when (bound-and-true-p eglot--managed-mode)
+        (eglot-shutdown (eglot-current-server))))
+    (add-hook 'poly-python-j2-mode-hook #'my/poly-j2-quiet)
+    (add-hook 'poly-jsx-j2-mode-hook    #'my/poly-j2-quiet)
+    (add-hook 'poly-tsx-j2-mode-hook    #'my/poly-j2-quiet)
+    (add-hook 'poly-js-j2-mode-hook     #'my/poly-j2-quiet))
+#+end_src
+
 * eglot setup
 ** eglot
 #+begin_src emacs-lisp
@@ -1053,6 +1122,21 @@ I don't fully use this right now. Perhaps I should.
    #+begin_src emacs-lisp
      (setq org-deadline-warning-days 0
            org-agenda-skip-scheduled-if-deadline-is-shown t)
+   #+end_src
+
+** agenda prefix
+   Replace the default =%c= (org category, which for us is just the
+   filename base and collapses work/inbox and personal/inbox to the
+   same string) with a path-derived label: =[work]=, =[personal]=,
+   =[proj:<slug>]=, etc. See =my/org-agenda-entry-label=.
+
+   #+begin_src emacs-lisp
+     (require 'my-org-agenda)
+     (setq org-agenda-prefix-format
+           '((agenda . " %i %-14(my/org-agenda-entry-label)%?-12t% s")
+             (todo   . " %i %-14(my/org-agenda-entry-label)")
+             (tags   . " %i %-14(my/org-agenda-entry-label)")
+             (search . " %i %-14(my/org-agenda-entry-label)")))
    #+end_src
 
 ** keybindings
