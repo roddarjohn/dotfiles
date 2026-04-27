@@ -109,9 +109,46 @@ let-bind `org-agenda-files', and an advice would clobber that binding."
 
 ;; ---- Commands ---------------------------------------------------
 
+(defvar my/org-agenda--scoping nil
+  "Dynamic file list carried through a scoped agenda run.
+`my/org-agenda--show-scoped' binds this and `org-agenda-files' to the
+same list, and `my/org-agenda--rewrap-redo-command' bakes the binding
+into `org-agenda-redo-command' so `g' (`org-agenda-redo') keeps the
+scope. Re-binding it inside the wrapped redo form is what lets the
+finalize hook re-wrap on every redo, so scope survives indefinitely.")
+
+(defun my/org-agenda--rewrap-redo-command ()
+  "Wrap the agenda's redo command to preserve the current scope.
+Runs from `org-agenda-finalize-hook'. `org-agenda-redo' actually reads
+the redo from the `org-redo-cmd' text property — the variable is
+secondary — so we update both. The agenda command resets them to
+unwrapped forms just before finalize, so we re-wrap each time."
+  (when (and (derived-mode-p 'org-agenda-mode)
+             my/org-agenda--scoping)
+    (let* ((files my/org-agenda--scoping)
+           (orig (or (get-text-property (point-min) 'org-redo-cmd)
+                     org-agenda-redo-command))
+           (wrapped (and orig
+                         `(let ((my/org-agenda--scoping ',files)
+                                (org-agenda-files ',files))
+                            ,orig))))
+      (when wrapped
+        (setq org-agenda-redo-command wrapped)
+        (let ((inhibit-read-only t))
+          (put-text-property (point-min) (point-max)
+                             'org-redo-cmd wrapped))))))
+
+(add-hook 'org-agenda-finalize-hook #'my/org-agenda--rewrap-redo-command)
+
 (defun my/org-agenda--show (files view)
   "Run `org-agenda' VIEW with FILES as its file list."
   (let ((org-agenda-files files))
+    (org-agenda nil view)))
+
+(defun my/org-agenda--show-scoped (files view)
+  "Run `org-agenda' VIEW scoped to FILES, persisting scope across `g'."
+  (let ((my/org-agenda--scoping files)
+        (org-agenda-files files))
     (org-agenda nil view)))
 
 (defun my/org-agenda-everything-week ()
@@ -143,12 +180,12 @@ let-bind `org-agenda-files', and an advice would clobber that binding."
 
 (defun my/org-agenda--run-category (subdir)
   "Internal: show SUBDIR agenda using `my/org-agenda--category-view'."
-  (my/org-agenda--show (my/org-agenda-files-for-category subdir)
-                       my/org-agenda--category-view))
+  (my/org-agenda--show-scoped (my/org-agenda-files-for-category subdir)
+                              my/org-agenda--category-view))
 
 (defun my/org-agenda--run-project (slug)
   "Internal: show TODO list for project SLUG."
-  (my/org-agenda--show (my/org-agenda-files-for-project slug) "t"))
+  (my/org-agenda--show-scoped (my/org-agenda-files-for-project slug) "t"))
 
 (defun my/org-agenda--category-children (_)
   "Dynamic children for the category agenda sub-transient."
