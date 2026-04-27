@@ -177,15 +177,18 @@ Each project gets its single-letter slug key (see
      for slug in slugs
      for idx from 1
      collect
-     (let* ((letter (cdr (assoc slug letters)))
+     ;; `cl-loop' updates SLUG via `setq', so all iterations share one
+     ;; binding cell. Shadow it with a fresh `let' binding so the
+     ;; per-project lambda below closes over its own value.
+     (let* ((slug slug)
+            (letter (cdr (assoc slug letters)))
             (key (or letter (number-to-string idx)))
             (cmd-name (intern (format "my/org-agenda--project-%s" slug))))
-       (unless (fboundp cmd-name)
-         (defalias cmd-name
-           (lambda ()
-             (interactive)
-             (my/org-agenda--run-project slug))
-           (format "Agenda for project %s." slug)))
+       (defalias cmd-name
+         (lambda ()
+           (interactive)
+           (my/org-agenda--run-project slug))
+         (format "Agenda for project %s." slug))
        (transient-parse-suffix
         'my/org-agenda-project-transient
         (list key slug cmd-name))))))
