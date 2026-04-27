@@ -825,8 +825,126 @@ I don't fully use this right now. Perhaps I should.
 | ruff-enable-on-save |
 
 * tree-sitter
+   Grammar sources are declared here so a fresh machine can pull
+   them with =M-x my/treesit-install-missing=. Each entry is the
+   form expected by =treesit-install-language-grammar=.
+
 #+begin_src emacs-lisp
   (add-to-list 'major-mode-remap-alist '(python-mode . python-ts-mode))
+
+  (setq treesit-language-source-alist
+        '((python     . ("https://github.com/tree-sitter/tree-sitter-python"))
+          (javascript . ("https://github.com/tree-sitter/tree-sitter-javascript"
+                         "master" "src"))
+          (typescript . ("https://github.com/tree-sitter/tree-sitter-typescript"
+                         "master" "typescript/src"))
+          (tsx        . ("https://github.com/tree-sitter/tree-sitter-typescript"
+                         "master" "tsx/src"))
+          (json       . ("https://github.com/tree-sitter/tree-sitter-json"))
+          (jsonnet    . ("https://github.com/sourcegraph/tree-sitter-jsonnet"))))
+
+  (defun my/treesit-install-missing ()
+    "Install any grammar in `treesit-language-source-alist' not already present."
+    (interactive)
+    (dolist (entry treesit-language-source-alist)
+      (let ((lang (car entry)))
+        (unless (treesit-language-available-p lang)
+          (message "Installing tree-sitter grammar: %s" lang)
+          (treesit-install-language-grammar lang)))))
+#+end_src
+
+* javascript / typescript
+** mode setup
+#+begin_src emacs-lisp
+  (add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.ts\\'"  . typescript-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.jsx\\'" . tsx-ts-mode))
+  (add-to-list 'major-mode-remap-alist '(js-mode         . js-ts-mode))
+  (add-to-list 'major-mode-remap-alist '(javascript-mode . js-ts-mode))
+#+end_src
+
+** format on save
+   Project-aware: walks up from the buffer to find a formatter
+   config and invokes the matching tool over stdin. No-ops silently
+   when no config is found, so opening a JS/TS file in a project
+   that doesn't ship a formatter doesn't surprise you.
+
+#+begin_src emacs-lisp
+  (defvar js-ts-biome-configs '("biome.json" "biome.jsonc"))
+
+  (defvar js-ts-prettier-configs
+    '(".prettierrc" ".prettierrc.json" ".prettierrc.yaml" ".prettierrc.yml"
+      ".prettierrc.json5" ".prettierrc.js" ".prettierrc.cjs"
+      ".prettierrc.mjs" ".prettierrc.toml"
+      "prettier.config.js" "prettier.config.cjs" "prettier.config.mjs"))
+
+  (defvar js-ts-dprint-configs '("dprint.json" ".dprint.json"))
+
+  (defun js-ts--has-config-p (dir filenames)
+    (seq-some (lambda (f) (file-exists-p (expand-file-name f dir))) filenames))
+
+  (defun js-ts--find-config-root (filenames)
+    (let ((start (or (and buffer-file-name (file-name-directory buffer-file-name))
+                     default-directory)))
+      (locate-dominating-file
+       start (lambda (d) (js-ts--has-config-p d filenames)))))
+
+  (defun js-ts--resolve-bin (root tool)
+    "Prefer ROOT/node_modules/.bin/TOOL when present, else TOOL on $PATH."
+    (let ((local (expand-file-name (concat "node_modules/.bin/" tool) root)))
+      (if (file-executable-p local) local tool)))
+
+  (defun js-ts--detect-formatter ()
+    "Return (CMD ARGS...) for the project's formatter, or nil."
+    (let ((file (or (buffer-file-name) "buffer.tsx")))
+      (cond
+       ((when-let ((root (js-ts--find-config-root js-ts-biome-configs)))
+          `(,(js-ts--resolve-bin root "biome")
+            "format" "--stdin-file-path" ,file)))
+       ((when-let ((root (js-ts--find-config-root js-ts-prettier-configs)))
+          `(,(js-ts--resolve-bin root "prettier")
+            "--stdin-filepath" ,file)))
+       ((when-let ((root (js-ts--find-config-root js-ts-dprint-configs)))
+          `(,(js-ts--resolve-bin root "dprint")
+            "fmt" "--stdin" ,file))))))
+
+  (defun js-ts-format-buffer ()
+    "Format the current buffer with the project's configured formatter."
+    (interactive)
+    (if-let ((cmd (js-ts--detect-formatter)))
+        (let* ((out-buf (generate-new-buffer " *js-ts-format*"))
+               (err-file (make-temp-file "js-ts-format-err-"))
+               (exit-code (apply #'call-process-region
+                                 (point-min) (point-max)
+                                 (car cmd) nil (list out-buf err-file) nil
+                                 (cdr cmd))))
+          (unwind-protect
+              (if (zerop exit-code)
+                  (let ((new-content (with-current-buffer out-buf (buffer-string)))
+                        (old-content (buffer-substring-no-properties
+                                      (point-min) (point-max))))
+                    (unless (string= new-content old-content)
+                      (let ((pos (point)))
+                        (erase-buffer)
+                        (insert new-content)
+                        (goto-char (min pos (point-max))))))
+                (message "js-ts format: %s failed (exit %d): %s"
+                         (car cmd) exit-code
+                         (with-temp-buffer
+                           (insert-file-contents err-file)
+                           (string-trim (buffer-string)))))
+            (kill-buffer out-buf)
+            (delete-file err-file)))
+      (when (called-interactively-p 'any)
+        (message "js-ts: no project formatter config found"))))
+
+  (defun js-ts-enable-format-on-save ()
+    (add-hook 'before-save-hook #'js-ts-format-buffer nil t))
+
+  (dolist (h '(js-ts-mode-hook
+               typescript-ts-mode-hook
+               tsx-ts-mode-hook))
+    (add-hook h #'js-ts-enable-format-on-save))
 #+end_src
 
 * jsonnet
@@ -938,6 +1056,9 @@ I don't fully use this right now. Perhaps I should.
   	         '((python-mode python-ts-mode) . ("uvx" "zuban" "server")))
     (add-to-list 'eglot-server-programs
                  '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
+    (add-to-list 'eglot-server-programs
+                 '((js-ts-mode typescript-ts-mode tsx-ts-mode)
+                   . ("typescript-language-server" "--stdio")))
     (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
     (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
     (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)
@@ -950,6 +1071,9 @@ I don't fully use this right now. Perhaps I should.
 
   (add-hook 'python-mode-hook 'eglot-ensure)
   (add-hook 'python-ts-mode-hook 'eglot-ensure)
+  (add-hook 'js-ts-mode-hook 'eglot-ensure)
+  (add-hook 'typescript-ts-mode-hook 'eglot-ensure)
+  (add-hook 'tsx-ts-mode-hook 'eglot-ensure)
 #+end_src
 ** copilot
 #+begin_src emacs-lisp
