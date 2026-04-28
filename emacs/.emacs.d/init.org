@@ -1286,6 +1286,20 @@ I don't fully use this right now. Perhaps I should.
              (search . " %i %-14(my/org-agenda-entry-label)")))
    #+end_src
 
+** super-agenda
+   Group agenda buffers into named sections. The "everything" entries
+   in =my/org-agenda-transient= bind =org-super-agenda-groups= to a
+   spec defined in =my-org-agenda=: =a= and =t= bucket by category /
+   project label, =T= buckets by tag.
+
+   #+begin_src emacs-lisp
+     (use-package org-super-agenda
+       :ensure t
+       :after org-agenda
+       :config
+       (org-super-agenda-mode))
+   #+end_src
+
 ** keybindings
    =C-c c= is plain org-capture; =C-c a= / =C-c v= / =C-c w= / =M-j=
    are the transients / entry points built on top of it.

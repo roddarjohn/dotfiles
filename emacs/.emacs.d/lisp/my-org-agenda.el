@@ -23,6 +23,10 @@
 (require 'my-org-core)
 (require 'my-org-projects)
 
+;; Declared dynamic so the byte-compiler doesn't flag our `let' binding
+;; as unused; the actual variable is owned by `org-super-agenda'.
+(defvar org-super-agenda-groups)
+
 (defconst my/org-agenda--todo-target-types
   '(file file+headline file+regexp)
   "Target types that produce agenda-relevant (TODO-bearing) captures.
@@ -117,21 +121,33 @@ into `org-agenda-redo-command' so `g' (`org-agenda-redo') keeps the
 scope. Re-binding it inside the wrapped redo form is what lets the
 finalize hook re-wrap on every redo, so scope survives indefinitely.")
 
+(defvar my/org-agenda--super-groups nil
+  "Dynamic `org-super-agenda-groups' spec carried through an agenda run.
+Same redo-wrapping trick as `my/org-agenda--scoping': set by the
+entry-point command, baked into the redo form by the finalize hook so
+`g' preserves the grouping.")
+
 (defun my/org-agenda--rewrap-redo-command ()
-  "Wrap the agenda's redo command to preserve the current scope.
+  "Wrap the agenda's redo command to preserve scope and super-agenda groups.
 Runs from `org-agenda-finalize-hook'. `org-agenda-redo' actually reads
 the redo from the `org-redo-cmd' text property — the variable is
 secondary — so we update both. The agenda command resets them to
 unwrapped forms just before finalize, so we re-wrap each time."
   (when (and (derived-mode-p 'org-agenda-mode)
-             my/org-agenda--scoping)
+             (or my/org-agenda--scoping my/org-agenda--super-groups))
     (let* ((files my/org-agenda--scoping)
+           (groups my/org-agenda--super-groups)
            (orig (or (get-text-property (point-min) 'org-redo-cmd)
                      org-agenda-redo-command))
-           (wrapped (and orig
-                         `(let ((my/org-agenda--scoping ',files)
-                                (org-agenda-files ',files))
-                            ,orig))))
+           (wrapped
+            (and orig
+                 `(let (,@(when files
+                            `((my/org-agenda--scoping ',files)
+                              (org-agenda-files ',files)))
+                        ,@(when groups
+                            `((my/org-agenda--super-groups ',groups)
+                              (org-super-agenda-groups ',groups))))
+                    ,orig))))
       (when wrapped
         (setq org-agenda-redo-command wrapped)
         (let ((inhibit-read-only t))
@@ -151,15 +167,76 @@ unwrapped forms just before finalize, so we re-wrap each time."
         (org-agenda-files files))
     (org-agenda nil view)))
 
+(defun my/org-agenda--show-grouped (files view groups)
+  "Run `org-agenda' VIEW with FILES and `org-super-agenda-groups' set to GROUPS.
+Both `my/org-agenda--super-groups' and `org-super-agenda-groups' are
+bound so the finalize hook can re-bake the grouping into the redo
+command. With GROUPS nil this behaves like `my/org-agenda--show'."
+  (let ((my/org-agenda--super-groups groups)
+        (org-super-agenda-groups groups)
+        (org-agenda-files files))
+    (org-agenda nil view)))
+
+;; ---- Super-agenda group specs ----------------------------------
+;;
+;; `:auto-category' would be the obvious grouping, but for us org's
+;; CATEGORY collapses to the filename base — so work/inbox.org and
+;; personal/inbox.org both end up as just \"inbox\". We use a custom
+;; `:auto-map' that delegates to `my/org-agenda-entry-label', which is
+;; already path-aware (\"[work]\", \"[proj:foo]\", etc.).
+
+(defun my/org-super-agenda-by-label (item)
+  "Group function for `org-super-agenda-groups' :auto-map.
+Returns the same label `my/org-agenda-entry-label' produces for ITEM,
+so super-agenda buckets match the agenda prefix."
+  (let ((marker (or (get-text-property 0 'org-marker item)
+                    (get-text-property 0 'org-hd-marker item))))
+    (and marker
+         (org-with-point-at marker
+           (my/org-agenda-entry-label)))))
+
+(defconst my/org-agenda--by-category-groups
+  '((:auto-map my/org-super-agenda-by-label))
+  "Super-agenda spec: bucket entries by their category/project label.")
+
+(defconst my/org-agenda--by-tag-groups
+  '((:auto-tags t))
+  "Super-agenda spec: bucket entries by their tags.")
+
+(defconst my/org-agenda--by-priority-then-category-groups
+  '((:name "High"   :priority "A")
+    (:name "Normal" :priority "B")
+    (:name "Low"    :priority "C")
+    (:auto-map my/org-super-agenda-by-label))
+  "Super-agenda spec: priority cookies first, then category/project label.
+Items without an explicit `[#X]' cookie fall through to the
+`my/org-super-agenda-by-label' bucket — they aren't treated as
+priority-B even though `org-priority-default' is ?B, because
+super-agenda reads the cookie directly.")
+
 (defun my/org-agenda-everything-week ()
-  "Weekly agenda across everything."
+  "Weekly agenda across everything, grouped by category."
   (interactive)
-  (my/org-agenda--show (my/org-agenda-files-all) "a"))
+  (my/org-agenda--show-grouped (my/org-agenda-files-all) "a"
+                               my/org-agenda--by-category-groups))
+
+(defun my/org-agenda-everything-week-by-tag ()
+  "Weekly agenda across everything, grouped by tag."
+  (interactive)
+  (my/org-agenda--show-grouped (my/org-agenda-files-all) "a"
+                               my/org-agenda--by-tag-groups))
 
 (defun my/org-agenda-everything-todo ()
-  "Flat TODO list across everything."
+  "Flat TODO list across everything, grouped by priority then category."
   (interactive)
-  (my/org-agenda--show (my/org-agenda-files-all) "t"))
+  (my/org-agenda--show-grouped (my/org-agenda-files-all) "t"
+                               my/org-agenda--by-priority-then-category-groups))
+
+(defun my/org-agenda-everything-todo-by-tag ()
+  "Flat TODO list across everything, grouped by tag."
+  (interactive)
+  (my/org-agenda--show-grouped (my/org-agenda-files-all) "t"
+                               my/org-agenda--by-tag-groups))
 
 (defun my/org-agenda-dispatch ()
   "Raw org-agenda dispatcher with the full capture file set."
@@ -262,8 +339,10 @@ Each project gets its single-letter slug key (see
 (transient-define-prefix my/org-agenda-transient ()
   "Org agenda dispatcher."
   ["Everything"
-   ("a" "Weekly agenda"       my/org-agenda-everything-week)
-   ("t" "All TODOs"           my/org-agenda-everything-todo)]
+   ("a" "Weekly agenda (by category)" my/org-agenda-everything-week)
+   ("A" "Weekly agenda (by tag)"      my/org-agenda-everything-week-by-tag)
+   ("t" "All TODOs (priority+cat)"    my/org-agenda-everything-todo)
+   ("T" "All TODOs (by tag)"          my/org-agenda-everything-todo-by-tag)]
   ["Filtered"
    ("c" "Category agenda..."  my/org-agenda-category-agenda-entry)
    ("C" "Category TODOs..."   my/org-agenda-category-todo-entry)
