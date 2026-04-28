@@ -852,6 +852,8 @@ I don't fully use this right now. Perhaps I should.
         (unless (treesit-language-available-p lang)
           (message "Installing tree-sitter grammar: %s" lang)
           (treesit-install-language-grammar lang)))))
+
+  (my/treesit-install-missing)
 #+end_src
 
 * javascript / typescript
@@ -954,6 +956,17 @@ I don't fully use this right now. Perhaps I should.
   (use-package jsonnet-mode
     :mode "\\.jsonnet\\'"
     :hook (jsonnet-mode . eglot-ensure))
+#+end_src
+
+* just
+  =just-mode= handles =justfile=, =Justfile=, =.justfile=, and =*.just=
+  out of the box. Eglot is wired to =just='s built-in language server
+  (still gated behind =--unstable= as of just 1.x). Swap in
+  =just-lsp= (=cargo install just-lsp=) by replacing the server
+  program below if you want the standalone implementation.
+#+begin_src emacs-lisp
+  (use-package just-mode
+    :hook (just-mode . eglot-ensure))
 #+end_src
 
 * jinja2 templates (polymode)
@@ -1064,6 +1077,8 @@ I don't fully use this right now. Perhaps I should.
     (add-to-list 'eglot-server-programs
                  '((css-mode css-ts-mode)
                    . ("vscode-css-language-server" "--stdio")))
+    (add-to-list 'eglot-server-programs
+                 '(just-mode . ("just" "--unstable" "--language-server")))
     (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
     (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
     (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)
@@ -1081,6 +1096,7 @@ I don't fully use this right now. Perhaps I should.
   (add-hook 'tsx-ts-mode-hook 'eglot-ensure)
   (add-hook 'css-mode-hook 'eglot-ensure)
   (add-hook 'css-ts-mode-hook 'eglot-ensure)
+  (add-hook 'just-mode-hook 'eglot-ensure)
 #+end_src
 ** copilot
 #+begin_src emacs-lisp
