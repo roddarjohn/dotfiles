@@ -1043,6 +1043,25 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (require 'transient)
 
+  ;; Monorepo-aware project root: when a buffer lives under a
+  ;; directory that contains a language-specific manifest
+  ;; (pyproject.toml, package.json, tsconfig.json), prefer that
+  ;; directory over the enclosing .git root.  Eglot uses
+  ;; `project-current' to decide where to spawn the LSP server, so
+  ;; without this it launches zuban / typescript-language-server at
+  ;; the repo root and they fail to find their config.
+  (defun my/project-try-manifest (dir)
+    "Find LSP-relevant project root by walking up from DIR for manifests."
+    (when-let* ((root (locate-dominating-file
+                       dir
+                       (lambda (d)
+                         (seq-some
+                          (lambda (f) (file-exists-p (expand-file-name f d)))
+                          '("pyproject.toml" "package.json" "tsconfig.json"))))))
+      (cons 'transient (expand-file-name root))))
+
+  (add-hook 'project-find-functions #'my/project-try-manifest -90)
+
   (transient-define-prefix my/eglot-transient ()
     "Dispatcher for eglot commands (LSP features, refactors, server admin)."
     [["Navigate"
