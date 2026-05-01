@@ -722,6 +722,11 @@ I don't fully use this right now. Perhaps I should.
     :config
     (setq markdown-command "pandoc"))
 #+end_src
+** text scale increase and decrease
+#+begin_src emacs-lisp
+  (bind-key "C-=" 'text-scale-increase)
+  (bind-key "C--" 'text-scale-decrease)
+#+end_src
 
 * mu4e
 ** root setup
