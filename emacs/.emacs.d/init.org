@@ -571,7 +571,8 @@ Project management in emacs
 			(name . "^\\.gitignore$")
 			(name . "^Doxyfile$")
 			(name . "^config\\.toml$")
-			(mode . yaml-mode)))
+			(mode . yaml-mode)
+			(mode . yaml-ts-mode)))
 	     ("Web" (or
 		     (mode . mhtml-mode)
 		     (mode . html-mode)
@@ -847,7 +848,8 @@ I don't fully use this right now. Perhaps I should.
                          "master" "tsx/src"))
           (json       . ("https://github.com/tree-sitter/tree-sitter-json"))
           (jsonnet    . ("https://github.com/sourcegraph/tree-sitter-jsonnet"))
-          (css        . ("https://github.com/tree-sitter/tree-sitter-css"))))
+          (css        . ("https://github.com/tree-sitter/tree-sitter-css"))
+          (yaml       . ("https://github.com/ikatyang/tree-sitter-yaml"))))
 
   (defun my/treesit-install-missing ()
     "Install any grammar in `treesit-language-source-alist' not already present."
@@ -867,9 +869,11 @@ I don't fully use this right now. Perhaps I should.
   (add-to-list 'auto-mode-alist '("\\.tsx\\'" . tsx-ts-mode))
   (add-to-list 'auto-mode-alist '("\\.ts\\'"  . typescript-ts-mode))
   (add-to-list 'auto-mode-alist '("\\.jsx\\'" . tsx-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.ya?ml\\'" . yaml-ts-mode))
   (add-to-list 'major-mode-remap-alist '(js-mode         . js-ts-mode))
   (add-to-list 'major-mode-remap-alist '(javascript-mode . js-ts-mode))
   (add-to-list 'major-mode-remap-alist '(css-mode        . css-ts-mode))
+  (add-to-list 'major-mode-remap-alist '(yaml-mode       . yaml-ts-mode))
 #+end_src
 
 ** format on save
