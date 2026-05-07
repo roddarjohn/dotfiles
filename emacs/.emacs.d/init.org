@@ -1324,6 +1324,11 @@ I don't fully use this right now. Perhaps I should.
    same string) with a path-derived label: =[work]=, =[personal]=,
    =[proj:<slug>]=, etc. See =my/org-agenda-entry-label=.
 
+   =org-agenda-todo-keyword-format= pads the TODO state to a fixed
+   width so headlines line up regardless of which keyword they're in.
+   =11= matches the longest keyword (=IN-PROGRESS=); bump it if you
+   add a longer one.
+
    #+begin_src emacs-lisp
      (require 'my-org-agenda)
      (setq org-agenda-prefix-format
@@ -1331,6 +1336,7 @@ I don't fully use this right now. Perhaps I should.
              (todo   . " %i %-14(my/org-agenda-entry-label)")
              (tags   . " %i %-14(my/org-agenda-entry-label)")
              (search . " %i %-14(my/org-agenda-entry-label)")))
+     (setq org-agenda-todo-keyword-format "%-11s")
    #+end_src
 
 ** super-agenda
