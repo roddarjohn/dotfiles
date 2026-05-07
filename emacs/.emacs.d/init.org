@@ -1247,6 +1247,25 @@ I don't fully use this right now. Perhaps I should.
               "* %?\n%U\n")))
    #+end_src
 
+** todo keywords
+   Richer than the default =TODO|DONE=. =BLOCKED= keeps started-but-
+   stuck items visually distinct from actively-progressing ones. Org
+   forbids spaces in keyword names, so =IN-PROGRESS= uses a hyphen.
+   The bracketed letters are =org-todo-keyword= fast-access shortcuts:
+   =C-c C-t <letter>= jumps straight to that state.
+
+   #+begin_src emacs-lisp
+     (setq org-todo-keywords
+           '((sequence "TODO(t)" "IN-PROGRESS(i)" "BLOCKED(b)"
+                       "|" "DONE(d)")))
+
+     (setq org-todo-keyword-faces
+           '(("TODO"        . (:inherit org-todo))
+             ("IN-PROGRESS" . (:inherit org-todo :foreground "#f0c674"))
+             ("BLOCKED"     . (:inherit org-todo :foreground "#cc6666"))
+             ("DONE"        . (:inherit org-done))))
+   #+end_src
+
 ** state
    Restore the persisted "current project" slug from the state file so
    the modeline segment and capture shortcuts come up correctly after
