@@ -1208,6 +1208,11 @@ I don't fully use this right now. Perhaps I should.
               :target (file+olp+datetree "notes.org" "Interview notes")
               :body my/org-interview-capture-template-body
               :opts (:tree-type week))
+             (notes
+              :key "n" :desc "Notes"
+              :target (file+olp+datetree "notes.org" "Notes")
+              :body "* %?\n"
+              :opts (:tree-type week))
              (whiteboard
               :key "w" :desc "Whiteboard"
               :target (file+olp+datetree "whiteboard.org")
