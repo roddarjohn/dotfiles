@@ -1094,9 +1094,38 @@ I don't fully use this right now. Perhaps I should.
       ("E" "Events buffer"    eglot-events-buffer)
       ("L" "Stderr buffer"    eglot-stderr-buffer)]])
 
+  ;; Run zuban inside the project's uv environment via `uv run',
+  ;; so the language server sees the project's dependencies
+  ;; (fastapi, sqlalchemy, ...).  `uvx' runs zuban in an isolated
+  ;; tool env containing only zuban itself, so every third-party
+  ;; import comes back unresolved.  `uv run' needs zuban to be a
+  ;; project dependency, though; when the project declares none we
+  ;; fall back to `uvx' (which always works) and warn that project
+  ;; deps will not resolve.
+  (defun my/zuban-eglot-contact (&optional _interactive)
+    "Return the eglot server command for zuban.
+Prefer `uv run' so the server resolves project dependencies; fall
+back to an isolated `uvx' invocation -- with a warning in the
+*Messages* buffer -- when the project declares no zuban dep."
+    (let* ((root (when-let* ((proj (project-current)))
+                   (project-root proj)))
+           (pyproject (and root (expand-file-name "pyproject.toml" root)))
+           (has-zuban (and pyproject
+                           (file-exists-p pyproject)
+                           (with-temp-buffer
+                             (insert-file-contents pyproject)
+                             (goto-char (point-min))
+                             (re-search-forward "^\\s-*\"zuban" nil t)))))
+      (if has-zuban
+          '("uv" "run" "zuban" "server")
+        (message
+         "[zuban] %s declares no zuban dependency; falling back to `uvx zuban' -- project deps (fastapi, sqlalchemy, ...) will NOT resolve"
+         (or root "this project"))
+        '("uvx" "zuban" "server"))))
+
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
-  	         '((python-mode python-ts-mode) . ("uvx" "zuban" "server")))
+                 '((python-mode python-ts-mode) . my/zuban-eglot-contact))
     (add-to-list 'eglot-server-programs
                  '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
     (add-to-list 'eglot-server-programs
