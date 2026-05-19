@@ -13,7 +13,7 @@ cd ~/dotfiles
 `bootstrap.sh` automates everything under Prerequisites and Install below:
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
 running `install.sh`, and (optionally, with prompts) installing
-`jsonnet-language-server` and `syncthing`. Each phase is idempotent, so
+`jsonnet-language-server`, `regal`, and `syncthing`. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
 
@@ -136,6 +136,19 @@ Download a pre-built binary from the [releases page](https://github.com/grafana/
 ```bash
 chmod +x jsonnet-language-server
 mv jsonnet-language-server ~/.local/bin/
+```
+
+Make sure `~/.local/bin` is on your `PATH`.
+
+#### regal (Rego)
+
+Eglot drives `.rego` files with [Regal](https://github.com/open-policy-agent/regal)'s
+language server. Download a pre-built binary from the
+[releases page](https://github.com/open-policy-agent/regal/releases):
+
+```bash
+chmod +x regal
+mv regal ~/.local/bin/
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.

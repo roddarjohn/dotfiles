@@ -967,6 +967,18 @@ I don't fully use this right now. Perhaps I should.
     :hook (jsonnet-mode . eglot-ensure))
 #+end_src
 
+* rego
+  =rego-mode= handles Open Policy Agent =.rego= policy files. Eglot
+  is wired to [[https://github.com/open-policy-agent/regal][Regal]]'s
+  language server (=regal language-server=), which provides
+  diagnostics, completion, hover, and go-to-definition. Install the
+  =regal= binary via =bootstrap.sh= or from its releases page.
+#+begin_src emacs-lisp
+  (use-package rego-mode
+    :mode "\\.rego\\'"
+    :hook (rego-mode . eglot-ensure))
+#+end_src
+
 * just
   =just-mode= handles =justfile=, =Justfile=, =.justfile=, and =*.just=
   out of the box. Eglot is wired to =just='s built-in language server
@@ -1054,7 +1066,7 @@ I don't fully use this right now. Perhaps I should.
 
   ;; Monorepo-aware project root: when a buffer lives under a
   ;; directory that contains a language-specific manifest
-  ;; (pyproject.toml, package.json, tsconfig.json), prefer that
+  ;; (pyproject.toml, package.json, tsconfig.json, .regal), prefer that
   ;; directory over the enclosing .git root.  Eglot uses
   ;; `project-current' to decide where to spawn the LSP server, so
   ;; without this it launches zuban / typescript-language-server at
@@ -1066,7 +1078,8 @@ I don't fully use this right now. Perhaps I should.
                        (lambda (d)
                          (seq-some
                           (lambda (f) (file-exists-p (expand-file-name f d)))
-                          '("pyproject.toml" "package.json" "tsconfig.json"))))))
+                          '("pyproject.toml" "package.json" "tsconfig.json"
+                            ".regal"))))))
       (cons 'transient (expand-file-name root))))
 
   (add-hook 'project-find-functions #'my/project-try-manifest -90)
@@ -1136,6 +1149,8 @@ back to an isolated `uvx' invocation -- with a warning in the
                    . ("vscode-css-language-server" "--stdio")))
     (add-to-list 'eglot-server-programs
                  '(just-mode . ("just" "--unstable" "--language-server")))
+    (add-to-list 'eglot-server-programs
+                 '(rego-mode . ("regal" "language-server")))
     (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
     (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
     (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)

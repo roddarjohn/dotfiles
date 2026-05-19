@@ -13,7 +13,8 @@
 #   5. ./install.sh          (stow, tpm + auto plugin install, fonts,
 #                             Cosmic terminal on Linux)
 #   6. jsonnet-language-server            (optional, prompted)
-#   7. syncthing                          (optional, prompted)
+#   7. regal (Rego language server)       (optional, prompted)
+#   8. syncthing                          (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -330,8 +331,51 @@ else
     esac
 fi
 
-# ── 7. syncthing (optional) ───────────────────────────────────────────
-section "7. syncthing (optional)"
+# ── 7. regal — Rego language server (optional) ────────────────────────
+section "7. regal (optional)"
+if [ -x "$HOME/.local/bin/regal" ]; then
+    skip "regal already at ~/.local/bin"
+else
+    read -r -p "Install regal (Rego language server) from GitHub releases? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            ARCH="$(uname -m)"
+            case "$PLATFORM-$ARCH" in
+                linux-x86_64)        REGAL_ASSET="regal_Linux_x86_64" ;;
+                linux-aarch64)       REGAL_ASSET="regal_Linux_arm64" ;;
+                darwin-x86_64)       REGAL_ASSET="regal_Darwin_x86_64" ;;
+                darwin-arm64)        REGAL_ASSET="regal_Darwin_arm64" ;;
+                *)                   REGAL_ASSET="" ;;
+            esac
+            if [ -z "$REGAL_ASSET" ]; then
+                warn "No matching release asset for $PLATFORM/$ARCH; skipping"
+            else
+                step "Resolving latest release URL for $REGAL_ASSET"
+                REGAL_URL=$(curl -fsSL \
+                    https://api.github.com/repos/open-policy-agent/regal/releases/latest \
+                    | grep -Eo "https://[^\"]*${REGAL_ASSET}" \
+                    | head -n1)
+                if [ -z "${REGAL_URL:-}" ]; then
+                    warn "Could not find $REGAL_ASSET in latest release; skipping"
+                else
+                    mkdir -p "$HOME/.local/bin"
+                    step "Downloading $REGAL_URL"
+                    curl -fsSL "$REGAL_URL" -o "$HOME/.local/bin/regal"
+                    chmod +x "$HOME/.local/bin/regal"
+                    ok "regal installed to ~/.local/bin"
+                    case ":${PATH:-}:" in
+                        *":$HOME/.local/bin:"*) ;;
+                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                    esac
+                fi
+            fi
+            ;;
+        *) skip "regal" ;;
+    esac
+fi
+
+# ── 8. syncthing (optional) ───────────────────────────────────────────
+section "8. syncthing (optional)"
 syncthing_already_enabled() {
     if [ "$PLATFORM" = "linux" ]; then
         systemctl --user is-enabled syncthing.service >/dev/null 2>&1
