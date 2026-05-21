@@ -35,5 +35,11 @@ else
   echo "zshrc: nvm not found, skipping"
 fi
 
+# Go-installed binaries (regal, actionlint, ...).  `go install`
+# drops binaries here by default; without this on PATH they're
+# only reachable via the absolute path.  Guarded so the line is
+# a no-op on machines that haven't installed Go tools yet.
+[ -d "$HOME/go/bin" ] && export PATH="$HOME/go/bin:$PATH"
+
 # For uv
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
