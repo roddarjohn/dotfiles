@@ -1,0 +1,27 @@
+[project]
+name = "jinja-shadow-lsp"
+version = "0.1.0"
+description = "A language server for Jinja templates that compiles them to a virtual host-language file (a 'shadow') and maps host tooling back to the template. v1: Python host, indentation-transfer formatting."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "jinja2>=3.1",
+    "pygls>=1.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+jinja-shadow-lsp = "jinja_shadow_lsp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jinja_shadow_lsp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
