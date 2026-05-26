@@ -92,6 +92,131 @@
     (when (derived-mode-p 'prog-mode)
       (delete-trailing-whitespace)))
 #+end_src
+** header-line
+#+begin_src emacs-lisp
+  (defun my/insert-header-line (text &optional width align fill)
+    "Insert a header line containing TEXT padded to WIDTH with FILL char.
+  ALIGN is one of `left', `right' or `center' (default `left').
+  WIDTH defaults to 80 and FILL defaults to ?─.
+
+  The line is inserted at point and runs *up to* column WIDTH, so any
+  text already before the cursor (e.g. a `# ' comment opener) counts
+  toward the total — the result still ends at column WIDTH, not beyond.
+
+  Called interactively this is the quick version: it prompts only for
+  TEXT and uses the defaults for the rest.  See
+  `my/insert-header-line-verbose' to be prompted for everything.
+
+  Example: TEXT \"BOOTSTRAP\" yields
+    ─── BOOTSTRAP ───────────────────────────────────────────────────────────────"
+    (interactive (list (read-string "Header text: ")))
+    (let* ((width (max 0 (- (or width 80) (current-column))))
+           (align (or align 'left))
+           (fill  (or fill ?─))
+           (label (if (string-empty-p text) "" (concat " " text " ")))
+           (pad   (max 0 (- width (length label))))
+           (lead  (min 3 pad))
+           (line
+            (pcase align
+              ('right  (concat (make-string (- pad lead) fill)
+                               label
+                               (make-string lead fill)))
+              ('center (let ((l (/ pad 2)))
+                         (concat (make-string l fill)
+                                 label
+                                 (make-string (- pad l) fill))))
+              (_       (concat (make-string lead fill)
+                               label
+                               (make-string (- pad lead) fill))))))
+      (insert line)))
+
+  (defun my/insert-header-line-verbose (text width align fill)
+    "Like `my/insert-header-line' but prompt for every argument.
+  Empty answers fall back to the defaults (width 80, left, ?─)."
+    (interactive
+     (list (read-string "Header text: ")
+           (read-number "Width: " 80)
+           (intern (completing-read "Align: " '("left" "right" "center")
+                                    nil t nil nil "left"))
+           (let ((s (read-string "Fill char (default ─): ")))
+             (if (string-empty-p s) ?─ (aref s 0)))))
+    (my/insert-header-line text width align fill))
+
+  (global-set-key (kbd "C-c -") #'my/insert-header-line)
+  (global-set-key (kbd "C-c _") #'my/insert-header-line-verbose)
+#+end_src
+** box
+#+begin_src emacs-lisp
+  (defvar my/box-styles
+    '((rounded ?─ ?│ ?╭ ?╮ ?╰ ?╯)
+      (square  ?─ ?│ ?┌ ?┐ ?└ ?┘)
+      (double  ?═ ?║ ?╔ ?╗ ?╚ ?╝)
+      (heavy   ?━ ?┃ ?┏ ?┓ ?┗ ?┛)
+      (ascii   ?= ?| ?+ ?+ ?+ ?+))
+    "Character sets for `my/insert-box', each (HORIZ VERT TL TR BL BR).")
+
+  (defun my/insert-box (text &optional width align style)
+    "Insert a three-line box around TEXT using box-drawing characters.
+  STYLE is a key in `my/box-styles' (default `rounded'): rounded, square,
+  double, heavy or ascii.  ALIGN positions TEXT within the box: `left'
+  (default), `right' or `center'.  WIDTH defaults to 80.
+
+  The box runs *up to* column WIDTH.  Whatever precedes the cursor on the
+  current line — indentation, a `# ' / `;; ' comment opener, etc. — is
+  carried onto the lower two lines, so the box stays commented and
+  aligned.
+
+  Called interactively this is the quick version: it prompts only for
+  TEXT and uses the defaults for the rest.  See `my/insert-box-verbose'
+  to be prompted for everything.
+
+  Example: TEXT \"BOOTSTRAP\" yields
+    ╭──────────────────────────────────────────────────────────────────────────╮
+    │ BOOTSTRAP                                                                  │
+    ╰──────────────────────────────────────────────────────────────────────────╯"
+    (interactive (list (read-string "Box text: ")))
+    (let* ((prefix (buffer-substring-no-properties (line-beginning-position) (point)))
+           (col    (current-column))
+           (width  (max 4 (- (or width 80) col)))
+           (align  (or align 'left))
+           (chars  (cdr (assq (or style 'rounded) my/box-styles)))
+           (horiz  (nth 0 chars))
+           (vert   (nth 1 chars))
+           (tl     (nth 2 chars))
+           (tr     (nth 3 chars))
+           (bl     (nth 4 chars))
+           (br     (nth 5 chars))
+           (inner  (- width 2))
+           (top    (concat (string tl) (make-string inner horiz) (string tr)))
+           (bottom (concat (string bl) (make-string inner horiz) (string br)))
+           (avail  (max 0 (- inner 2)))
+           (txt    (truncate-string-to-width text avail))
+           (gap    (max 0 (- avail (string-width txt))))
+           (content
+            (pcase align
+              ('right  (concat (make-string gap ?\s) txt))
+              ('center (let ((l (/ gap 2)))
+                         (concat (make-string l ?\s) txt (make-string (- gap l) ?\s))))
+              (_       (concat txt (make-string gap ?\s)))))
+           (mid (concat (string vert) " " content " " (string vert))))
+      (insert top "\n" prefix mid "\n" prefix bottom)))
+
+  (defun my/insert-box-verbose (text width align style)
+    "Like `my/insert-box' but prompt for width, alignment and style too.
+  Empty answers fall back to the defaults (width 80, left, rounded)."
+    (interactive
+     (list (read-string "Box text: ")
+           (read-number "Width: " 80)
+           (intern (completing-read "Align: " '("left" "right" "center")
+                                    nil t nil nil "left"))
+           (intern (completing-read
+                    "Style: " (mapcar (lambda (s) (symbol-name (car s))) my/box-styles)
+                    nil t nil nil "rounded"))))
+    (my/insert-box text width align style))
+
+  (global-set-key (kbd "C-c =") #'my/insert-box)
+  (global-set-key (kbd "C-c +") #'my/insert-box-verbose)
+#+end_src
 ** beacon
 #+begin_src emacs-lisp
      (use-package beacon
@@ -849,7 +974,8 @@ I don't fully use this right now. Perhaps I should.
           (json       . ("https://github.com/tree-sitter/tree-sitter-json"))
           (jsonnet    . ("https://github.com/sourcegraph/tree-sitter-jsonnet"))
           (css        . ("https://github.com/tree-sitter/tree-sitter-css"))
-          (yaml       . ("https://github.com/ikatyang/tree-sitter-yaml"))))
+          (yaml       . ("https://github.com/ikatyang/tree-sitter-yaml"))
+          (just       . ("https://github.com/IndianBoy42/tree-sitter-just"))))
 
   (defun my/treesit-install-missing ()
     "Install any grammar in `treesit-language-source-alist' not already present."
@@ -980,83 +1106,195 @@ I don't fully use this right now. Perhaps I should.
 #+end_src
 
 * just
-  =just-mode= handles =justfile=, =Justfile=, =.justfile=, and =*.just=
-  out of the box. Eglot is wired to =just='s built-in language server
-  (still gated behind =--unstable= as of just 1.x). Swap in
-  =just-lsp= (=cargo install just-lsp=) by replacing the server
-  program below if you want the standalone implementation.
+  Justfiles use =just-ts-mode= (tree-sitter, via the
+  [[https://github.com/IndianBoy42/tree-sitter-just][tree-sitter-just]]
+  grammar) exclusively -- the old regex =just-mode= is gone. The grammar
+  is built by =my/treesit-install-missing= (it's listed in
+  =treesit-language-source-alist=). Using the grammar fixes the
+  comment/string highlighting bugs the regex mode had (e.g. an apostrophe
+  in a comment).
+
+  Eglot is wired to =just='s built-in language server (=just --unstable
+  --language-server=; swap in =just-lsp= if preferred). Indentation is
+  minimal, so we format on save with =just --fmt= -- file-only, so
+  =my/just-format-buffer= round-trips through a temp file preserving
+  point -- and pin =indent-tabs-mode= off / =tab-width= 4.
 #+begin_src emacs-lisp
-  (use-package just-mode
-    :hook (just-mode . eglot-ensure))
+  (use-package just-ts-mode
+    :straight (:host github :repo "leon-barrett/just-ts-mode.el")
+    :mode (("/\\(?:\\.\\)?[jJ][uU][sS][tT][fF][iI][lL][eE]\\'" . just-ts-mode)
+           ("\\.just\\'" . just-ts-mode)))
+
+  (defun my/just-format-buffer ()
+    "Format the current justfile buffer in place with `just --fmt'."
+    (interactive)
+    (when (executable-find "just")
+      (let ((tmp (make-temp-file "just-fmt-" nil ".just"))
+            (err-file (make-temp-file "just-fmt-err-")))
+        (unwind-protect
+            (progn
+              (write-region (point-min) (point-max) tmp nil 'silent)
+              (let ((exit (call-process "just" nil (list nil err-file) nil
+                                        "--unstable" "--fmt" "-f" tmp)))
+                (if (zerop exit)
+                    (let ((new (with-temp-buffer
+                                 (insert-file-contents tmp)
+                                 (buffer-string)))
+                          (old (buffer-substring-no-properties
+                                (point-min) (point-max))))
+                      (unless (string= new old)
+                        (let ((pos (point)))
+                          (erase-buffer)
+                          (insert new)
+                          (goto-char (min pos (point-max))))))
+                  (message "just --fmt failed (exit %d): %s" exit
+                           (with-temp-buffer
+                             (insert-file-contents err-file)
+                             (string-trim (buffer-string)))))))
+          (delete-file tmp)
+          (delete-file err-file)))))
+
+  (defun my/just-setup ()
+    "Indent + format-on-save for `just-ts-mode'."
+    (setq-local indent-tabs-mode nil
+                tab-width 4)
+    (add-hook 'before-save-hook #'my/just-format-buffer nil t))
+
+  (add-hook 'just-ts-mode-hook #'my/just-setup)
 #+end_src
 
-* jinja2 templates (polymode)
+* jinja2 templates
+  All jinja files -- standalone (=*.jinja=, =*.jinja2=, =*.j2=) and
+  host-templated (=*.py.j2=, =*.tsx.j2=, ...) -- use plain =jinja2-mode=.
+  We dropped the previous polymode host+inner setup: it was brittle, had
+  to suppress eglot/flymake, and never parsed cleanly because a templated
+  file isn't valid host source. The trade-off is that host code inside a
+  template (the Python/TSX between tags) is no longer syntax-highlighted.
+
+  =jinja2-mode= buffers attach to =jinja-shadow-lsp= (see the eglot
+  section) for Jinja syntax diagnostics from the real Jinja2 parser. That
+  server compiles the template to a virtual host-language "shadow" file
+  and is the foundation for future host-aware features; it does not
+  format anything. Build it once with =uv sync= in
+  =~/workspace/dotfiles/jinja-shadow-lsp=.
 #+begin_src emacs-lisp
   (use-package jinja2-mode
-    :defer t)
-
-  (use-package polymode
-    :mode (("\\.py\\.j2\\'"  . poly-python-j2-mode)
-           ("\\.jsx\\.j2\\'" . poly-jsx-j2-mode)
-           ("\\.tsx\\.j2\\'" . poly-tsx-j2-mode)
-           ("\\.js\\.j2\\'"  . poly-js-j2-mode))
+    :mode (("\\.j2\\'" . jinja2-mode)
+           ("\\.jinja\\'" . jinja2-mode)
+           ("\\.jinja2\\'" . jinja2-mode))
     :config
-    (define-innermode poly-jinja2-expr-innermode
-      :mode 'jinja2-mode
-      :head-matcher "{{"
-      :tail-matcher "}}"
-      :head-mode 'body
-      :tail-mode 'body)
-    (define-innermode poly-jinja2-stmt-innermode
-      :mode 'jinja2-mode
-      :head-matcher "{%"
-      :tail-matcher "%}"
-      :head-mode 'body
-      :tail-mode 'body)
-    (define-innermode poly-jinja2-comment-innermode
-      :mode 'jinja2-mode
-      :head-matcher "{#"
-      :tail-matcher "#}"
-      :head-mode 'body
-      :tail-mode 'body)
+    ;; jinja2-mode binds C-c c / C-c v / C-c t / C-c # for tag insertion,
+    ;; which shadow our global C-c bindings (notably `C-c c' = org-capture,
+    ;; `C-c v'). Remove them so the globals win in jinja buffers.
+    (dolist (key '("C-c c" "C-c v" "C-c t" "C-c #"))
+      (keymap-unset jinja2-mode-map key t)))
+#+end_src
 
-    (define-hostmode poly-python-j2-hostmode :mode 'python-ts-mode)
-    (define-hostmode poly-jsx-j2-hostmode    :mode 'tsx-ts-mode)
-    (define-hostmode poly-tsx-j2-hostmode    :mode 'tsx-ts-mode)
-    (define-hostmode poly-js-j2-hostmode     :mode 'js-ts-mode)
+* jinja host highlighting (tree-sitter injection)
+  Host-templated files (=*.py.j2=, =*.tsx.j2=, ...) use =jinja-ts-mode=,
+  which highlights the *host* language with its real tree-sitter parser
+  while leaving the jinja tags alone. There is no jinja tree-sitter
+  grammar involved: we run the host language's parser over just the spans
+  *outside* the jinja tags (computed by regexp), reusing the host
+  =*-ts-mode='s font-lock, and overlay the tags via jit-lock. The embed
+  language is chosen from the inner extension. Plain =*.j2= / =*.jinja=
+  (no inner extension) stay in =jinja2-mode=.
+#+begin_src emacs-lisp
+  (defvar jinja-ts-embed-languages
+    '(("py"   . (python     . python-ts-mode))
+      ("pyi"  . (python     . python-ts-mode))
+      ("ts"   . (typescript . typescript-ts-mode))
+      ("tsx"  . (tsx        . tsx-ts-mode))
+      ("jsx"  . (tsx        . tsx-ts-mode))
+      ("js"   . (javascript . js-ts-mode))
+      ("css"  . (css        . css-ts-mode))
+      ("json" . (json       . json-ts-mode))
+      ("yaml" . (yaml       . yaml-ts-mode))
+      ("yml"  . (yaml       . yaml-ts-mode)))
+    "Inner extension -> (TS-LANGUAGE . TS-MODE) for jinja host injection.")
 
-    (define-polymode poly-python-j2-mode
-      :hostmode 'poly-python-j2-hostmode
-      :innermodes '(poly-jinja2-expr-innermode
-                    poly-jinja2-stmt-innermode
-                    poly-jinja2-comment-innermode))
-    (define-polymode poly-jsx-j2-mode
-      :hostmode 'poly-jsx-j2-hostmode
-      :innermodes '(poly-jinja2-expr-innermode
-                    poly-jinja2-stmt-innermode
-                    poly-jinja2-comment-innermode))
-    (define-polymode poly-tsx-j2-mode
-      :hostmode 'poly-tsx-j2-hostmode
-      :innermodes '(poly-jinja2-expr-innermode
-                    poly-jinja2-stmt-innermode
-                    poly-jinja2-comment-innermode))
-    (define-polymode poly-js-j2-mode
-      :hostmode 'poly-js-j2-hostmode
-      :innermodes '(poly-jinja2-expr-innermode
-                    poly-jinja2-stmt-innermode
-                    poly-jinja2-comment-innermode))
+  (defconst jinja-ts--tag-re "{%[-+]?.*?[-+]?%}\\|{{.*?}}\\|{#.*?#}"
+    "Regexp matching a single jinja tag (statement / expression / comment).")
 
-    ;; The host file isn't valid Python/JS, so silence flymake and
-    ;; keep eglot from latching onto the buffer.
-    (defun my/poly-j2-quiet ()
-      (flymake-mode -1)
-      (setq-local eglot-stay-out-of '(flymake))
-      (when (bound-and-true-p eglot--managed-mode)
-        (eglot-shutdown (eglot-current-server))))
-    (add-hook 'poly-python-j2-mode-hook #'my/poly-j2-quiet)
-    (add-hook 'poly-jsx-j2-mode-hook    #'my/poly-j2-quiet)
-    (add-hook 'poly-tsx-j2-mode-hook    #'my/poly-j2-quiet)
-    (add-hook 'poly-js-j2-mode-hook     #'my/poly-j2-quiet))
+  (defvar-local jinja-ts--embed-parser nil)
+
+  (defun jinja-ts--entry ()
+    "Return (LANG . MODE) for the current buffer's inner extension, or nil."
+    (when buffer-file-name
+      (let ((name (file-name-nondirectory buffer-file-name)))
+        (when (string-match
+               "\\.\\([^.]+\\)\\.\\(?:j2\\|jinja2?\\|jinja\\)\\'" name)
+          (cdr (assoc (match-string 1 name) jinja-ts-embed-languages))))))
+
+  (defun jinja-ts--host-ranges ()
+    "Buffer ranges (BEG . END) that lie outside jinja tags."
+    (save-excursion
+      (goto-char (point-min))
+      (let ((pos (point-min)) ranges)
+        (while (re-search-forward jinja-ts--tag-re nil t)
+          (when (> (match-beginning 0) pos)
+            (push (cons pos (match-beginning 0)) ranges))
+          (setq pos (match-end 0)))
+        (when (< pos (point-max))
+          (push (cons pos (point-max)) ranges))
+        (or (nreverse ranges) (list (cons (point-min) (point-max)))))))
+
+  (defun jinja-ts--update-ranges (&rest _)
+    (when (treesit-parser-p jinja-ts--embed-parser)
+      (treesit-parser-set-included-ranges
+       jinja-ts--embed-parser (jinja-ts--host-ranges))))
+
+  (defvar jinja-ts--config-cache (make-hash-table :test 'eq)
+    "Cache of host language -> (FONT-LOCK-SETTINGS . FEATURE-LIST).")
+
+  (defun jinja-ts--host-config (lang mode-fn)
+    (or (gethash lang jinja-ts--config-cache)
+        (puthash lang
+                 (with-temp-buffer
+                   (funcall mode-fn)
+                   (cons treesit-font-lock-settings
+                         treesit-font-lock-feature-list))
+                 jinja-ts--config-cache)))
+
+  (defun jinja-ts--fontify-tags (start end)
+    "Overlay jinja tag faces; runs as a jit-lock function after treesit."
+    (save-excursion
+      (goto-char start)
+      (while (re-search-forward jinja-ts--tag-re end t)
+        (let ((face (cond ((eq (char-after (1+ (match-beginning 0))) ?#)
+                           'font-lock-comment-face)
+                          (t 'font-lock-preprocessor-face))))
+          (put-text-property (match-beginning 0) (match-end 0) 'face face)))))
+
+  (define-derived-mode jinja-ts-mode prog-mode "Jinja[ts]"
+    "Highlight a Jinja template's host language via tree-sitter injection."
+    (let* ((entry (jinja-ts--entry))
+           (lang (car entry))
+           (mode-fn (cdr entry)))
+      (when (and lang (fboundp mode-fn) (treesit-ready-p lang))
+        (let ((cfg (jinja-ts--host-config lang mode-fn))
+              (parser (treesit-parser-create lang)))
+          (setq jinja-ts--embed-parser parser)
+          (treesit-parser-set-included-ranges parser (jinja-ts--host-ranges))
+          (setq-local treesit-primary-parser parser
+                      treesit-font-lock-settings (car cfg)
+                      treesit-font-lock-feature-list (cdr cfg)
+                      treesit-font-lock-level 4)
+          (treesit-major-mode-setup)
+          ;; treesit-major-mode-setup may reset ranges; reapply.
+          (treesit-parser-set-included-ranges parser (jinja-ts--host-ranges))
+          (add-hook 'after-change-functions #'jinja-ts--update-ranges nil t)))
+      ;; Tag highlighting runs after treesit's fontification.
+      (jit-lock-register #'jinja-ts--fontify-tags)
+      (add-hook 'jit-lock-functions #'jinja-ts--fontify-tags t t)))
+
+  ;; Route host-templated files to jinja-ts-mode (front of auto-mode-alist
+  ;; so these win over jinja2-mode's plain "\\.j2\\'").
+  (dolist (ext (mapcar #'car jinja-ts-embed-languages))
+    (add-to-list 'auto-mode-alist
+                 (cons (format "\\.%s\\.\\(?:j2\\|jinja2?\\|jinja\\)\\'"
+                               (regexp-quote ext))
+                       'jinja-ts-mode)))
 #+end_src
 
 * eglot setup
@@ -1136,6 +1374,38 @@ back to an isolated `uvx' invocation -- with a warning in the
          (or root "this project"))
         '("uvx" "zuban" "server"))))
 
+  (defvar my/jinja-shadow-lsp-dir
+    (expand-file-name "workspace/dotfiles/jinja-shadow-lsp" "~")
+    "Project root of the jinja-shadow-lsp language server.")
+
+  (defun my/jinja-shadow-lsp-program ()
+    "Absolute path to the jinja-shadow-lsp executable in its uv venv."
+    (expand-file-name ".venv/bin/jinja-shadow-lsp" my/jinja-shadow-lsp-dir))
+
+  ;; jinja-shadow-lsp is host-agnostic: a single `jinja2-mode' entry handles
+  ;; every *.j2 file, and the server dispatches to the right downstream host
+  ;; server by the inner extension (foo.py.j2 -> python). To stay general,
+  ;; the downstream servers are data-driven here: add one line per host as
+  ;; shadow generators for more languages land (only python ships today).
+  (defvar my/jinja-shadow-downstream-servers
+    '((python . ["uv" "run" "zuban" "server"]))
+    "Alist of host language id (symbol) -> launch command (a vector).
+Passed to jinja-shadow-lsp as initializationOptions so it can forward a
+template's shadow to the underlying language server for its host. The
+command is spawned with cwd set to the project root, so `uv run' resolves
+the project venv (use [\"uvx\" \"zuban\" \"server\"] if zuban isn't a project
+dependency).")
+
+  (defun my/jinja-shadow-lsp-init-options ()
+    "Build jinja-shadow-lsp initializationOptions from the downstream alist."
+    (let (servers)
+      (dolist (pair my/jinja-shadow-downstream-servers)
+        (setq servers
+              (append servers
+                      (list (intern (format ":%s" (car pair)))
+                            (list :command (cdr pair))))))
+      (list :servers servers)))
+
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
                  '((python-mode python-ts-mode) . my/zuban-eglot-contact))
@@ -1148,9 +1418,14 @@ back to an isolated `uvx' invocation -- with a warning in the
                  '((css-mode css-ts-mode)
                    . ("vscode-css-language-server" "--stdio")))
     (add-to-list 'eglot-server-programs
-                 '(just-mode . ("just" "--unstable" "--language-server")))
+                 '(just-ts-mode . ("just" "--unstable" "--language-server")))
     (add-to-list 'eglot-server-programs
                  '(rego-mode . ("regal" "language-server")))
+    (add-to-list 'eglot-server-programs
+                 `((jinja2-mode jinja-ts-mode)
+                   . (,(my/jinja-shadow-lsp-program)
+                      :initializationOptions
+                      ,(my/jinja-shadow-lsp-init-options))))
     (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
     (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
     (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)
@@ -1168,7 +1443,20 @@ back to an isolated `uvx' invocation -- with a warning in the
   (add-hook 'tsx-ts-mode-hook 'eglot-ensure)
   (add-hook 'css-mode-hook 'eglot-ensure)
   (add-hook 'css-ts-mode-hook 'eglot-ensure)
-  (add-hook 'just-mode-hook 'eglot-ensure)
+  (add-hook 'just-ts-mode-hook 'eglot-ensure)
+
+  ;; jinja-shadow-lsp: attach to real jinja file buffers, and only when
+  ;; the server has actually been installed via `uv sync' in
+  ;; `my/jinja-shadow-lsp-dir'. (The `buffer-base-buffer' guard keeps it
+  ;; out of any indirect buffers.) The server provides Jinja syntax
+  ;; diagnostics; it does not format.
+  (defun my/jinja-shadow-eglot-maybe ()
+    (when (and buffer-file-name
+               (not (buffer-base-buffer))
+               (file-executable-p (my/jinja-shadow-lsp-program)))
+      (eglot-ensure)))
+  (add-hook 'jinja2-mode-hook #'my/jinja-shadow-eglot-maybe)
+  (add-hook 'jinja-ts-mode-hook #'my/jinja-shadow-eglot-maybe)
 #+end_src
 ** copilot
 #+begin_src emacs-lisp

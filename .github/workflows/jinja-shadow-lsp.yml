@@ -1,0 +1,26 @@
+name: jinja-shadow-lsp
+
+on:
+  push:
+    paths:
+      - 'jinja-shadow-lsp/**'
+      - '.github/workflows/jinja-shadow-lsp.yml'
+  pull_request:
+    paths:
+      - 'jinja-shadow-lsp/**'
+      - '.github/workflows/jinja-shadow-lsp.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: jinja-shadow-lsp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: jinja-shadow-lsp/uv.lock
+      - run: uv sync --extra dev --locked
+      - run: uv run pytest
