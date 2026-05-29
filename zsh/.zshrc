@@ -43,3 +43,14 @@ fi
 
 # For uv
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
+
+# mise (https://mise.jdx.dev) — runtime + tool version manager.
+# Activates mise's shims/env so tools it manages are on PATH. Placed
+# last so it takes precedence over pyenv/nvm where they overlap.
+# Guarded so the line is a no-op on machines without mise installed.
+if command -v mise &>/dev/null; then
+  eval "$(mise activate zsh)"
+else
+  echo "zshrc: mise not found, skipping"
+fi
+eval "$(/home/rodda/.local/bin/mise activate zsh)"

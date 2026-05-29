@@ -15,7 +15,8 @@
 #   6. jsonnet-language-server            (optional, prompted)
 #   7. regal (Rego language server)       (optional, prompted)
 #   8. terraform-ls (Terraform LSP)       (optional, prompted)
-#   9. syncthing                          (optional, prompted)
+#   9. mise (runtime/tool manager)        (optional, prompted)
+#  10. syncthing                          (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -424,8 +425,32 @@ else
     esac
 fi
 
-# ── 9. syncthing (optional) ───────────────────────────────────────────
-section "9. syncthing (optional)"
+# ── 9. mise — runtime / tool version manager (optional) ───────────────
+section "9. mise (optional)"
+if [ -x "$HOME/.local/bin/mise" ] || command -v mise >/dev/null 2>&1; then
+    skip "mise already installed"
+else
+    read -r -p "Install mise (runtime/tool version manager)? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            step "Installing mise via https://mise.run"
+            curl -fsSL https://mise.run | sh
+            if [ -x "$HOME/.local/bin/mise" ]; then
+                ok "mise installed to ~/.local/bin (activated in .zshrc)"
+                case ":${PATH:-}:" in
+                    *":$HOME/.local/bin:"*) ;;
+                    *) warn "~/.local/bin is not on your PATH — add it to use mise" ;;
+                esac
+            else
+                warn "mise install script finished but ~/.local/bin/mise not found"
+            fi
+            ;;
+        *) skip "mise" ;;
+    esac
+fi
+
+# ── 10. syncthing (optional) ──────────────────────────────────────────
+section "10. syncthing (optional)"
 syncthing_already_enabled() {
     if [ "$PLATFORM" = "linux" ]; then
         systemctl --user is-enabled syncthing.service >/dev/null 2>&1

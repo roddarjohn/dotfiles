@@ -13,7 +13,7 @@ cd ~/dotfiles
 `bootstrap.sh` automates everything under Prerequisites and Install below:
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
 running `install.sh`, and (optionally, with prompts) installing
-`jsonnet-language-server`, `regal`, `terraform-ls`, and `syncthing`. Each phase is idempotent, so
+`jsonnet-language-server`, `regal`, `terraform-ls`, `mise`, and `syncthing`. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
 
