@@ -14,7 +14,8 @@
 #                             Cosmic terminal on Linux)
 #   6. jsonnet-language-server            (optional, prompted)
 #   7. regal (Rego language server)       (optional, prompted)
-#   8. syncthing                          (optional, prompted)
+#   8. terraform-ls (Terraform LSP)       (optional, prompted)
+#   9. syncthing                          (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -374,8 +375,57 @@ else
     esac
 fi
 
-# ── 8. syncthing (optional) ───────────────────────────────────────────
-section "8. syncthing (optional)"
+# ── 8. terraform-ls — Terraform language server (optional) ────────────
+section "8. terraform-ls (optional)"
+if [ -x "$HOME/.local/bin/terraform-ls" ]; then
+    skip "terraform-ls already at ~/.local/bin"
+else
+    read -r -p "Install terraform-ls (Terraform language server) from GitHub releases? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            ARCH="$(uname -m)"
+            case "$PLATFORM-$ARCH" in
+                linux-x86_64)        TFLS_SUFFIX="_linux_amd64.zip" ;;
+                linux-aarch64)       TFLS_SUFFIX="_linux_arm64.zip" ;;
+                darwin-x86_64)       TFLS_SUFFIX="_darwin_amd64.zip" ;;
+                darwin-arm64)        TFLS_SUFFIX="_darwin_arm64.zip" ;;
+                *)                   TFLS_SUFFIX="" ;;
+            esac
+            if [ -z "$TFLS_SUFFIX" ]; then
+                warn "No matching release asset for $PLATFORM/$ARCH; skipping"
+            elif ! command -v unzip >/dev/null 2>&1; then
+                warn "unzip not found; install it and re-run — skipping terraform-ls"
+            else
+                step "Resolving latest release URL for terraform-ls$TFLS_SUFFIX"
+                TFLS_URL=$(curl -fsSL \
+                    https://api.github.com/repos/hashicorp/terraform-ls/releases/latest \
+                    | grep -Eo "https://[^\"]*terraform-ls_[^\"]*${TFLS_SUFFIX}" \
+                    | head -n1)
+                if [ -z "${TFLS_URL:-}" ]; then
+                    warn "Could not find terraform-ls$TFLS_SUFFIX in latest release; skipping"
+                else
+                    mkdir -p "$HOME/.local/bin"
+                    TFLS_TMP=$(mktemp -d)
+                    step "Downloading $TFLS_URL"
+                    curl -fsSL "$TFLS_URL" -o "$TFLS_TMP/terraform-ls.zip"
+                    step "Unzipping terraform-ls"
+                    unzip -o -q "$TFLS_TMP/terraform-ls.zip" terraform-ls -d "$HOME/.local/bin"
+                    chmod +x "$HOME/.local/bin/terraform-ls"
+                    rm -rf "$TFLS_TMP"
+                    ok "terraform-ls installed to ~/.local/bin"
+                    case ":${PATH:-}:" in
+                        *":$HOME/.local/bin:"*) ;;
+                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                    esac
+                fi
+            fi
+            ;;
+        *) skip "terraform-ls" ;;
+    esac
+fi
+
+# ── 9. syncthing (optional) ───────────────────────────────────────────
+section "9. syncthing (optional)"
 syncthing_already_enabled() {
     if [ "$PLATFORM" = "linux" ]; then
         systemctl --user is-enabled syncthing.service >/dev/null 2>&1

@@ -1105,6 +1105,30 @@ I don't fully use this right now. Perhaps I should.
     :hook (rego-mode . eglot-ensure))
 #+end_src
 
+* terraform / hcl
+  =terraform-mode= handles Terraform =.tf= / =.tfvars= files and
+  =hcl-mode= (its dependency) handles generic HashiCorp HCL, which
+  includes Terragrunt configs (=terragrunt.hcl=, =root.hcl=, ...) and the
+  =.terraform.lock.hcl= lockfile -- anything ending in =.hcl=.
+
+  Eglot is wired to HashiCorp's official
+  [[https://github.com/hashicorp/terraform-ls][terraform-ls]] for the
+  Terraform modes (diagnostics, completion, hover, go-to-definition);
+  install the binary via =bootstrap.sh= or from its releases page.
+  Terraform buffers format on save with =terraform fmt= via
+  =terraform-format-on-save-mode=. Plain HCL / Terragrunt files get
+  =hcl-mode= highlighting and indentation but no language server --
+  terraform-ls only understands Terraform.
+#+begin_src emacs-lisp
+  (use-package hcl-mode
+    :mode "\\.hcl\\'")
+
+  (use-package terraform-mode
+    :mode ("\\.tf\\'" "\\.tfvars\\'")
+    :hook ((terraform-mode . eglot-ensure)
+           (terraform-mode . terraform-format-on-save-mode)))
+#+end_src
+
 * just
   Justfiles use =just-ts-mode= (tree-sitter, via the
   [[https://github.com/IndianBoy42/tree-sitter-just][tree-sitter-just]]
@@ -1304,7 +1328,8 @@ I don't fully use this right now. Perhaps I should.
 
   ;; Monorepo-aware project root: when a buffer lives under a
   ;; directory that contains a language-specific manifest
-  ;; (pyproject.toml, package.json, tsconfig.json, .regal), prefer that
+  ;; (pyproject.toml, package.json, tsconfig.json, .regal,
+  ;; .terraform.lock.hcl), prefer that
   ;; directory over the enclosing .git root.  Eglot uses
   ;; `project-current' to decide where to spawn the LSP server, so
   ;; without this it launches zuban / typescript-language-server at
@@ -1317,7 +1342,7 @@ I don't fully use this right now. Perhaps I should.
                          (seq-some
                           (lambda (f) (file-exists-p (expand-file-name f d)))
                           '("pyproject.toml" "package.json" "tsconfig.json"
-                            ".regal"))))))
+                            ".regal" ".terraform.lock.hcl"))))))
       (cons 'transient (expand-file-name root))))
 
   (add-hook 'project-find-functions #'my/project-try-manifest -90)
@@ -1421,6 +1446,8 @@ dependency).")
                  '(just-ts-mode . ("just" "--unstable" "--language-server")))
     (add-to-list 'eglot-server-programs
                  '(rego-mode . ("regal" "language-server")))
+    (add-to-list 'eglot-server-programs
+                 '(terraform-mode . ("terraform-ls" "serve")))
     (add-to-list 'eglot-server-programs
                  `((jinja2-mode jinja-ts-mode)
                    . (,(my/jinja-shadow-lsp-program)

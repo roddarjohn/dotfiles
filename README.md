@@ -13,7 +13,7 @@ cd ~/dotfiles
 `bootstrap.sh` automates everything under Prerequisites and Install below:
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
 running `install.sh`, and (optionally, with prompts) installing
-`jsonnet-language-server`, `regal`, and `syncthing`. Each phase is idempotent, so
+`jsonnet-language-server`, `regal`, `terraform-ls`, and `syncthing`. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
 
@@ -149,6 +149,24 @@ language server. Download a pre-built binary from the
 ```bash
 chmod +x regal
 mv regal ~/.local/bin/
+```
+
+Make sure `~/.local/bin` is on your `PATH`.
+
+#### terraform-ls (Terraform / HCL)
+
+Eglot drives Terraform `.tf` / `.tfvars` files (via `terraform-mode`) with
+HashiCorp's official
+[terraform-ls](https://github.com/hashicorp/terraform-ls). Generic HCL and
+Terragrunt configs (`*.hcl`, e.g. `terragrunt.hcl`) use `hcl-mode` for
+highlighting and indentation but get no language server. Download a
+pre-built archive from the
+[releases page](https://github.com/hashicorp/terraform-ls/releases),
+then extract the binary:
+
+```bash
+unzip terraform-ls_*.zip terraform-ls -d ~/.local/bin/
+chmod +x ~/.local/bin/terraform-ls
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
