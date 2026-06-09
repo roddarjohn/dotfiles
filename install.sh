@@ -27,7 +27,7 @@ done
 rm -rf "$HOME/.emacs.d"
 mkdir -p "$HOME/.emacs.d"
 
-for pkg in zsh tmux emacs; do
+for pkg in zsh tmux emacs bin; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
 done

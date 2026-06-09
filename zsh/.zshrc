@@ -44,6 +44,10 @@ fi
 # For uv
 [ -f "$HOME/.local/bin/env" ] && source "$HOME/.local/bin/env"
 
+# Short alias for the org-contributions reporter (lives in ~/.local/bin,
+# stowed from the dotfiles `bin` package; runs itself via `uv run --script`).
+alias ghoc='gh-org-contributions'
+
 # mise (https://mise.jdx.dev) — runtime + tool version manager.
 # Activates mise's shims/env so tools it manages are on PATH. Placed
 # last so it takes precedence over pyenv/nvm where they overlap.

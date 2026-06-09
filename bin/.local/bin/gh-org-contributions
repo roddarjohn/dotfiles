@@ -1,0 +1,373 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx>=0.27"]
+# ///
+"""
+gh-org-contributions — who committed what across an entire GitHub org.
+
+Lists every repo in an org, walks each default branch over a time window,
+and aggregates commits per author (GitHub login when linked, otherwise the
+git author email). Repos are fetched concurrently with a bounded semaphore
+and the GitHub rate limit is respected.
+
+Examples
+--------
+    gh-org-contributions fshtech                 # last 7 days
+    gh-org-contributions fshtech --since 30d
+    gh-org-contributions fshtech --since 2025-01-01 --until 2025-04-01
+    gh-org-contributions fshtech --no-merges --json
+    gh-org-contributions fshtech --stats         # adds per-commit add/del (slow)
+
+Auth (first that resolves wins): --token, $GITHUB_TOKEN, $GH_TOKEN, `gh auth token`.
+For GitHub Enterprise set --base-url or $GITHUB_API_URL.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import datetime as dt
+import json
+import os
+import re
+import subprocess
+import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
+
+import httpx
+
+DEFAULT_BASE_URL = "https://api.github.com"
+API_VERSION = "2022-11-28"
+
+
+# --------------------------------------------------------------------------- #
+# helpers
+# --------------------------------------------------------------------------- #
+def eprint(*args, **kwargs) -> None:
+    print(*args, file=sys.stderr, **kwargs)
+
+
+def resolve_token(explicit: str | None) -> str:
+    if explicit:
+        return explicit
+    for env in ("GITHUB_TOKEN", "GH_TOKEN"):
+        if os.environ.get(env):
+            return os.environ[env]
+    try:
+        out = subprocess.run(
+            ["gh", "auth", "token"], capture_output=True, text=True, timeout=10
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    raise SystemExit(
+        "No token found. Pass --token, set $GITHUB_TOKEN/$GH_TOKEN, "
+        "or run `gh auth login`."
+    )
+
+
+def parse_when(value: str) -> dt.datetime:
+    """Accept relative durations (12h, 7d, 2w, 3mo, 1y) or ISO dates/datetimes."""
+    value = value.strip()
+    m = re.fullmatch(r"(\d+)(h|d|w|mo|y)", value)
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        now = dt.datetime.now(dt.timezone.utc)
+        delta = {
+            "h": dt.timedelta(hours=n),
+            "d": dt.timedelta(days=n),
+            "w": dt.timedelta(weeks=n),
+            "mo": dt.timedelta(days=30 * n),
+            "y": dt.timedelta(days=365 * n),
+        }[unit]
+        return now - delta
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise SystemExit(
+            f"Could not parse time value {value!r}. "
+            "Use e.g. 7d, 2w, 3mo, or an ISO date like 2025-01-01."
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def iso_z(d: dt.datetime) -> str:
+    return d.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --------------------------------------------------------------------------- #
+# aggregation model
+# --------------------------------------------------------------------------- #
+@dataclass
+class Author:
+    key: str
+    label: str
+    linked: bool          # True if attributed to a real GitHub account
+    commits: int = 0
+    additions: int = 0
+    deletions: int = 0
+    repos: set[str] = field(default_factory=set)
+
+
+# --------------------------------------------------------------------------- #
+# GitHub client (thin async wrapper with retry + rate-limit awareness)
+# --------------------------------------------------------------------------- #
+class GitHub:
+    def __init__(self, client: httpx.AsyncClient):
+        self.client = client
+
+    async def _get(self, url: str, params: dict | None = None) -> httpx.Response:
+        for attempt in range(6):
+            resp = await self.client.get(url, params=params)
+            if resp.status_code < 400:
+                return resp
+            # primary or secondary rate limit
+            if resp.status_code in (403, 429):
+                retry_after = resp.headers.get("retry-after")
+                remaining = resp.headers.get("x-ratelimit-remaining")
+                if retry_after is not None:
+                    wait = float(retry_after)
+                elif remaining == "0":
+                    reset = int(resp.headers.get("x-ratelimit-reset", "0"))
+                    wait = max(reset - dt.datetime.now(dt.timezone.utc).timestamp(), 1)
+                else:
+                    wait = 2 ** attempt
+                wait = min(wait, 300) + 1
+                eprint(f"  rate limited; sleeping {wait:.0f}s …")
+                await asyncio.sleep(wait)
+                continue
+            if resp.status_code in (500, 502, 503):
+                await asyncio.sleep(2 ** attempt)
+                continue
+            resp.raise_for_status()
+        resp.raise_for_status()
+        return resp  # unreachable
+
+    async def paginate(self, url: str, params: dict):
+        params = dict(params, per_page=100)
+        while url:
+            resp = await self._get(url, params=params)
+            batch = resp.json()
+            if not isinstance(batch, list):
+                return
+            for item in batch:
+                yield item
+            url = resp.links.get("next", {}).get("url")
+            params = None  # the "next" url already carries query params
+
+    async def list_repos(self, org: str):
+        async for repo in self.paginate(f"/orgs/{org}/repos", {"type": "all"}):
+            yield repo
+
+    async def commit_stats(self, full_name: str, sha: str) -> tuple[int, int]:
+        resp = await self._get(f"/repos/{full_name}/commits/{sha}")
+        stats = resp.json().get("stats", {})
+        return int(stats.get("additions", 0)), int(stats.get("deletions", 0))
+
+
+# --------------------------------------------------------------------------- #
+# core
+# --------------------------------------------------------------------------- #
+async def collect_repo(
+    gh: GitHub,
+    repo: dict,
+    since: str,
+    until: str | None,
+    no_merges: bool,
+    with_stats: bool,
+    out: dict[str, Author],
+    lock: asyncio.Lock,
+) -> None:
+    full_name = repo["full_name"]
+    params = {"since": since}
+    if until:
+        params["until"] = until
+    try:
+        async for commit in gh.paginate(f"/repos/{full_name}/commits", params):
+            if no_merges and len(commit.get("parents", [])) > 1:
+                continue
+
+            gh_author = commit.get("author") or {}
+            git_author = (commit.get("commit") or {}).get("author") or {}
+            login = gh_author.get("login")
+            if login:
+                key, label, linked = login.lower(), login, True
+            else:
+                email = (git_author.get("email") or "unknown").lower()
+                name = git_author.get("name") or email
+                key, label, linked = f"email:{email}", f"{name} <{email}>", False
+
+            adds = dels = 0
+            if with_stats:
+                try:
+                    adds, dels = await gh.commit_stats(full_name, commit["sha"])
+                except httpx.HTTPStatusError:
+                    pass
+
+            async with lock:
+                a = out.get(key)
+                if a is None:
+                    a = out[key] = Author(key=key, label=label, linked=linked)
+                a.commits += 1
+                a.additions += adds
+                a.deletions += dels
+                a.repos.add(repo["name"])
+    except httpx.HTTPStatusError as exc:
+        # 409 = empty repo, 404 = no access; both are fine to skip.
+        if exc.response.status_code not in (404, 409):
+            eprint(f"  warning: {full_name}: {exc.response.status_code}")
+
+
+async def run(args: argparse.Namespace) -> dict[str, Author]:
+    since = iso_z(parse_when(args.since))
+    until = iso_z(parse_when(args.until)) if args.until else None
+
+    headers = {
+        "Authorization": f"Bearer {resolve_token(args.token)}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": API_VERSION,
+        "User-Agent": "gh-org-contributions",
+    }
+    base_url = args.base_url or os.environ.get("GITHUB_API_URL", DEFAULT_BASE_URL)
+
+    out: dict[str, Author] = {}
+    lock = asyncio.Lock()
+    sem = asyncio.Semaphore(args.concurrency)
+
+    async with httpx.AsyncClient(
+        base_url=base_url, headers=headers, timeout=30.0
+    ) as client:
+        gh = GitHub(client)
+
+        repos = []
+        async for repo in gh.list_repos(args.org):
+            if repo.get("fork") and not args.include_forks:
+                continue
+            if repo.get("archived") and not args.include_archived:
+                continue
+            repos.append(repo)
+        eprint(f"Scanning {len(repos)} repos in {args.org} "
+               f"(since {since}{', until ' + until if until else ''}) …")
+
+        done = 0
+
+        async def worker(repo: dict) -> None:
+            nonlocal done
+            async with sem:
+                await collect_repo(
+                    gh, repo, since, until, args.no_merges, args.stats, out, lock
+                )
+            done += 1
+            eprint(f"  [{done}/{len(repos)}] {repo['full_name']}")
+
+        await asyncio.gather(*(worker(r) for r in repos))
+
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# output
+# --------------------------------------------------------------------------- #
+def render_table(authors: list[Author], with_stats: bool) -> None:
+    if not authors:
+        eprint("No contributions found in this window.")
+        return
+
+    rows = []
+    for a in authors:
+        row = [a.label + ("" if a.linked else "  (unlinked)"),
+               str(a.commits), str(len(a.repos))]
+        if with_stats:
+            row += [f"+{a.additions}", f"-{a.deletions}"]
+        rows.append(row)
+
+    headers = ["author", "commits", "repos"] + (["adds", "dels"] if with_stats else [])
+    widths = [
+        max(len(headers[i]), max(len(r[i]) for r in rows)) for i in range(len(headers))
+    ]
+
+    def fmt(cols: list[str]) -> str:
+        cells = [cols[0].ljust(widths[0])] + [
+            cols[i].rjust(widths[i]) for i in range(1, len(cols))
+        ]
+        return "  ".join(cells)
+
+    print(fmt(headers))
+    print("  ".join("-" * w for w in widths))
+    for r in rows:
+        print(fmt(r))
+
+    total_commits = sum(a.commits for a in authors)
+    print("  ".join("-" * w for w in widths))
+    eprint(f"\n{len(authors)} contributors, {total_commits} commits total.")
+
+
+def render_json(authors: list[Author]) -> None:
+    print(json.dumps(
+        [
+            {
+                "author": a.label,
+                "linked": a.linked,
+                "commits": a.commits,
+                "repos": sorted(a.repos),
+                "additions": a.additions,
+                "deletions": a.deletions,
+            }
+            for a in authors
+        ],
+        indent=2,
+    ))
+
+
+# --------------------------------------------------------------------------- #
+# cli
+# --------------------------------------------------------------------------- #
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        description="Aggregate commit contributions by user across all repos in a GitHub org.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("org", help="GitHub organization login (e.g. fshtech)")
+    p.add_argument("--since", default="7d",
+                   help="Window start: relative (7d, 2w, 3mo, 1y, 12h) or ISO date. Default: 7d")
+    p.add_argument("--until", default=None,
+                   help="Window end (relative or ISO date). Default: now")
+    p.add_argument("--token", default=None, help="GitHub token (else env / gh auth token)")
+    p.add_argument("--base-url", default=None, help="API base URL for GitHub Enterprise")
+    p.add_argument("--include-forks", action="store_true", help="Include forked repos")
+    p.add_argument("--include-archived", action="store_true", help="Include archived repos")
+    p.add_argument("--no-merges", action="store_true", help="Exclude merge commits")
+    p.add_argument("--stats", action="store_true",
+                   help="Fetch per-commit additions/deletions (1 extra API call per commit)")
+    p.add_argument("--concurrency", type=int, default=8, help="Concurrent repo fetches (default 8)")
+    p.add_argument("--sort", choices=("commits", "repos", "name"), default="commits",
+                   help="Sort order (default: commits)")
+    p.add_argument("--json", action="store_true", help="Emit JSON instead of a table")
+    return p
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    out = asyncio.run(run(args))
+
+    authors = list(out.values())
+    if args.sort == "commits":
+        authors.sort(key=lambda a: (-a.commits, a.label.lower()))
+    elif args.sort == "repos":
+        authors.sort(key=lambda a: (-len(a.repos), a.label.lower()))
+    else:
+        authors.sort(key=lambda a: a.label.lower())
+
+    if args.json:
+        render_json(authors)
+    else:
+        render_table(authors, args.stats)
+
+
+if __name__ == "__main__":
+    main()
