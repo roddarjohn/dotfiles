@@ -15,8 +15,9 @@
 #   6. jsonnet-language-server            (optional, prompted)
 #   7. regal (Rego language server)       (optional, prompted)
 #   8. tofu-ls (OpenTofu/Terraform LSP)   (optional, prompted)
-#   9. mise (runtime/tool manager)        (optional, prompted)
-#  10. syncthing                          (optional, prompted)
+#   9. terragrunt-ls (Terragrunt LSP)     (optional, prompted)
+#  10. mise (runtime/tool manager)        (optional, prompted)
+#  11. syncthing                          (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -423,8 +424,56 @@ else
     esac
 fi
 
-# ── 9. mise — runtime / tool version manager (optional) ───────────────
-section "9. mise (optional)"
+# ── 9. terragrunt-ls — Terragrunt language server (optional) ──────────
+section "9. terragrunt-ls (optional)"
+if [ -x "$HOME/.local/bin/terragrunt-ls" ]; then
+    skip "terragrunt-ls already at ~/.local/bin"
+else
+    read -r -p "Install terragrunt-ls (Terragrunt language server) from GitHub releases? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            ARCH="$(uname -m)"
+            case "$PLATFORM-$ARCH" in
+                linux-x86_64)        TGLS_PLAT="linux_amd64" ;;
+                linux-aarch64)       TGLS_PLAT="linux_arm64" ;;
+                darwin-x86_64)       TGLS_PLAT="darwin_amd64" ;;
+                darwin-arm64)        TGLS_PLAT="darwin_arm64" ;;
+                *)                   TGLS_PLAT="" ;;
+            esac
+            if [ -z "$TGLS_PLAT" ]; then
+                warn "No matching release asset for $PLATFORM/$ARCH; skipping"
+            else
+                step "Resolving latest release URL for terragrunt-ls_$TGLS_PLAT.tar.gz"
+                TGLS_URL=$(curl -fsSL \
+                    https://api.github.com/repos/gruntwork-io/terragrunt-ls/releases/latest \
+                    | grep -Eo "https://[^\"]*terragrunt-ls_${TGLS_PLAT}\.tar\.gz" \
+                    | head -n1)
+                if [ -z "${TGLS_URL:-}" ]; then
+                    warn "Could not find terragrunt-ls_$TGLS_PLAT.tar.gz in latest release; skipping"
+                else
+                    mkdir -p "$HOME/.local/bin"
+                    TGLS_TMP=$(mktemp -d)
+                    step "Downloading $TGLS_URL"
+                    curl -fsSL "$TGLS_URL" -o "$TGLS_TMP/terragrunt-ls.tar.gz"
+                    step "Extracting terragrunt-ls"
+                    # the archive holds a single platform-suffixed binary
+                    tar -xzf "$TGLS_TMP/terragrunt-ls.tar.gz" -C "$TGLS_TMP" "terragrunt-ls_$TGLS_PLAT"
+                    install -m 0755 "$TGLS_TMP/terragrunt-ls_$TGLS_PLAT" "$HOME/.local/bin/terragrunt-ls"
+                    rm -rf "$TGLS_TMP"
+                    ok "terragrunt-ls installed to ~/.local/bin"
+                    case ":${PATH:-}:" in
+                        *":$HOME/.local/bin:"*) ;;
+                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                    esac
+                fi
+            fi
+            ;;
+        *) skip "terragrunt-ls" ;;
+    esac
+fi
+
+# ── 10. mise — runtime / tool version manager (optional) ──────────────
+section "10. mise (optional)"
 if [ -x "$HOME/.local/bin/mise" ] || command -v mise >/dev/null 2>&1; then
     skip "mise already installed"
 else
@@ -447,8 +496,8 @@ else
     esac
 fi
 
-# ── 10. syncthing (optional) ──────────────────────────────────────────
-section "10. syncthing (optional)"
+# ── 11. syncthing (optional) ──────────────────────────────────────────
+section "11. syncthing (optional)"
 syncthing_already_enabled() {
     if [ "$PLATFORM" = "linux" ]; then
         systemctl --user is-enabled syncthing.service >/dev/null 2>&1

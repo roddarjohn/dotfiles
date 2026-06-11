@@ -1127,12 +1127,30 @@ I don't fully use this right now. Perhaps I should.
   the binary via =bootstrap.sh= or from its releases page. Terraform
   buffers format on save with =tofu fmt= (=terraform-command= is
   pointed at the =tofu= binary) via =terraform-format-on-save-mode=.
-  Plain HCL / Terragrunt files get =hcl-mode= highlighting and
-  indentation but no language server -- tofu-ls only understands
-  Terraform/OpenTofu.
+
+  Terragrunt files get =terragrunt-mode= -- a thin derivative of
+  =hcl-mode= (same highlighting and indentation) that exists so eglot
+  can attach Gruntwork's
+  [[https://github.com/gruntwork-io/terragrunt-ls][terragrunt-ls]]
+  (stdio, experimental but official) without dragging it into
+  non-Terragrunt HCL. Terragrunt configs go by many names
+  (=terragrunt.hcl=, =terragrunt.stack.hcl=, =root.hcl=, =env.hcl=,
+  arbitrary include files...), so like the upstream editor plugins we
+  claim =.hcl= wholesale and carve out the known non-Terragrunt files
+  (=.terraform.lock.hcl=, =.tflint.hcl=), which stay in plain
+  =hcl-mode=. Entries are matched in order, so the carve-outs are
+  added after (i.e. ahead of) the catch-all.
 #+begin_src emacs-lisp
-  (use-package hcl-mode
-    :mode "\\.hcl\\'")
+  (use-package hcl-mode)
+
+  (define-derived-mode terragrunt-mode hcl-mode "Terragrunt"
+    "An hcl-mode derivative for Terragrunt config files.")
+
+  (add-to-list 'auto-mode-alist '("\\.hcl\\'" . terragrunt-mode))
+  (add-to-list 'auto-mode-alist '("\\.terraform\\.lock\\.hcl\\'" . hcl-mode))
+  (add-to-list 'auto-mode-alist '("\\.tflint\\.hcl\\'" . hcl-mode))
+
+  (add-hook 'terragrunt-mode-hook #'eglot-ensure)
 
   (use-package terraform-mode
     :mode ("\\.tf\\'" "\\.tfvars\\'")
@@ -1460,6 +1478,8 @@ dependency).")
                  '(rego-mode . ("regal" "language-server")))
     (add-to-list 'eglot-server-programs
                  '(terraform-mode . ("tofu-ls" "serve")))
+    (add-to-list 'eglot-server-programs
+                 '(terragrunt-mode . ("terragrunt-ls")))
     (add-to-list 'eglot-server-programs
                  `((jinja2-mode jinja-ts-mode)
                    . (,(my/jinja-shadow-lsp-program)

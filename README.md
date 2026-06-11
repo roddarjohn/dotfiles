@@ -13,7 +13,7 @@ cd ~/dotfiles
 `bootstrap.sh` automates everything under Prerequisites and Install below:
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
 running `install.sh`, and (optionally, with prompts) installing
-`jsonnet-language-server`, `regal`, `tofu-ls`, `mise`, and `syncthing`. Each phase is idempotent, so
+`jsonnet-language-server`, `regal`, `tofu-ls`, `terragrunt-ls`, `mise`, and `syncthing`. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
 
@@ -157,15 +157,18 @@ Make sure `~/.local/bin` is on your `PATH`.
 
 Eglot drives Terraform `.tf` / `.tfvars` files (via `terraform-mode`) with
 OpenTofu's [tofu-ls](https://github.com/opentofu/tofu-ls); format on save
-uses `tofu fmt`, so install OpenTofu (e.g. via `mise`). Generic HCL and
-Terragrunt configs (`*.hcl`, e.g. `terragrunt.hcl`) use `hcl-mode` for
-highlighting and indentation but get no language server. Download a
-pre-built archive from the
-[releases page](https://github.com/opentofu/tofu-ls/releases),
-then extract the binary:
+uses `tofu fmt`, so install OpenTofu (e.g. via `mise`). Terragrunt and
+other `*.hcl` files (except `.terraform.lock.hcl` / `.tflint.hcl`) use
+`terragrunt-mode` (an `hcl-mode` derivative) with Gruntwork's
+[terragrunt-ls](https://github.com/gruntwork-io/terragrunt-ls). Download
+pre-built archives from the releases pages
+([tofu-ls](https://github.com/opentofu/tofu-ls/releases),
+[terragrunt-ls](https://github.com/gruntwork-io/terragrunt-ls/releases)),
+then extract the binaries:
 
 ```bash
 tar -xzf tofu-ls_*.tar.gz -C ~/.local/bin/ tofu-ls
+tar -xzf terragrunt-ls_*.tar.gz -C ~/.local/bin/ terragrunt-ls
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
