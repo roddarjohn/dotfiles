@@ -832,12 +832,22 @@ I don't fully use this right now. Perhaps I should.
 : t
 
 ** exec-path-from-shell
+   mise's =activate= hook only adjusts PATH in interactive shells, so
+   the snapshot exec-path-from-shell takes misses mise-managed tools
+   (tofu, terragrunt, ...). Appending the shims directory fixes that:
+   each shim resolves the version pinned by the invoking buffer's
+   project config at call time.
 #+begin_src emacs-lisp
   (use-package exec-path-from-shell
     :ensure t
     :config
     (setq exec-path-from-shell-shell-name "/bin/zsh")
     (exec-path-from-shell-initialize))
+
+  (let ((mise-shims (expand-file-name "~/.local/share/mise/shims")))
+    (when (file-directory-p mise-shims)
+      (add-to-list 'exec-path mise-shims t)
+      (setenv "PATH" (concat (getenv "PATH") path-separator mise-shims))))
 #+end_src
 
 ** markdown
@@ -1111,20 +1121,22 @@ I don't fully use this right now. Perhaps I should.
   includes Terragrunt configs (=terragrunt.hcl=, =root.hcl=, ...) and the
   =.terraform.lock.hcl= lockfile -- anything ending in =.hcl=.
 
-  Eglot is wired to HashiCorp's official
-  [[https://github.com/hashicorp/terraform-ls][terraform-ls]] for the
-  Terraform modes (diagnostics, completion, hover, go-to-definition);
-  install the binary via =bootstrap.sh= or from its releases page.
-  Terraform buffers format on save with =terraform fmt= via
-  =terraform-format-on-save-mode=. Plain HCL / Terragrunt files get
-  =hcl-mode= highlighting and indentation but no language server --
-  terraform-ls only understands Terraform.
+  Eglot is wired to OpenTofu's
+  [[https://github.com/opentofu/tofu-ls][tofu-ls]] for the Terraform
+  modes (diagnostics, completion, hover, go-to-definition); install
+  the binary via =bootstrap.sh= or from its releases page. Terraform
+  buffers format on save with =tofu fmt= (=terraform-command= is
+  pointed at the =tofu= binary) via =terraform-format-on-save-mode=.
+  Plain HCL / Terragrunt files get =hcl-mode= highlighting and
+  indentation but no language server -- tofu-ls only understands
+  Terraform/OpenTofu.
 #+begin_src emacs-lisp
   (use-package hcl-mode
     :mode "\\.hcl\\'")
 
   (use-package terraform-mode
     :mode ("\\.tf\\'" "\\.tfvars\\'")
+    :custom (terraform-command "tofu")
     :hook ((terraform-mode . eglot-ensure)
            (terraform-mode . terraform-format-on-save-mode)))
 #+end_src
@@ -1447,7 +1459,7 @@ dependency).")
     (add-to-list 'eglot-server-programs
                  '(rego-mode . ("regal" "language-server")))
     (add-to-list 'eglot-server-programs
-                 '(terraform-mode . ("terraform-ls" "serve")))
+                 '(terraform-mode . ("tofu-ls" "serve")))
     (add-to-list 'eglot-server-programs
                  `((jinja2-mode jinja-ts-mode)
                    . (,(my/jinja-shadow-lsp-program)

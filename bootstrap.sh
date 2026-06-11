@@ -14,7 +14,7 @@
 #                             Cosmic terminal on Linux)
 #   6. jsonnet-language-server            (optional, prompted)
 #   7. regal (Rego language server)       (optional, prompted)
-#   8. terraform-ls (Terraform LSP)       (optional, prompted)
+#   8. tofu-ls (OpenTofu/Terraform LSP)   (optional, prompted)
 #   9. mise (runtime/tool manager)        (optional, prompted)
 #  10. syncthing                          (optional, prompted)
 #
@@ -376,44 +376,42 @@ else
     esac
 fi
 
-# ── 8. terraform-ls — Terraform language server (optional) ────────────
-section "8. terraform-ls (optional)"
-if [ -x "$HOME/.local/bin/terraform-ls" ]; then
-    skip "terraform-ls already at ~/.local/bin"
+# ── 8. tofu-ls — OpenTofu/Terraform language server (optional) ────────
+section "8. tofu-ls (optional)"
+if [ -x "$HOME/.local/bin/tofu-ls" ]; then
+    skip "tofu-ls already at ~/.local/bin"
 else
-    read -r -p "Install terraform-ls (Terraform language server) from GitHub releases? [y/N] " answer
+    read -r -p "Install tofu-ls (OpenTofu/Terraform language server) from GitHub releases? [y/N] " answer
     case "${answer:-}" in
         [yY]*)
             ARCH="$(uname -m)"
             case "$PLATFORM-$ARCH" in
-                linux-x86_64)        TFLS_SUFFIX="_linux_amd64.zip" ;;
-                linux-aarch64)       TFLS_SUFFIX="_linux_arm64.zip" ;;
-                darwin-x86_64)       TFLS_SUFFIX="_darwin_amd64.zip" ;;
-                darwin-arm64)        TFLS_SUFFIX="_darwin_arm64.zip" ;;
+                linux-x86_64)        TFLS_SUFFIX="_Linux_x86_64.tar.gz" ;;
+                linux-aarch64)       TFLS_SUFFIX="_Linux_arm64.tar.gz" ;;
+                darwin-x86_64)       TFLS_SUFFIX="_Darwin_x86_64.tar.gz" ;;
+                darwin-arm64)        TFLS_SUFFIX="_Darwin_arm64.tar.gz" ;;
                 *)                   TFLS_SUFFIX="" ;;
             esac
             if [ -z "$TFLS_SUFFIX" ]; then
                 warn "No matching release asset for $PLATFORM/$ARCH; skipping"
-            elif ! command -v unzip >/dev/null 2>&1; then
-                warn "unzip not found; install it and re-run — skipping terraform-ls"
             else
-                step "Resolving latest release URL for terraform-ls$TFLS_SUFFIX"
+                step "Resolving latest release URL for tofu-ls$TFLS_SUFFIX"
                 TFLS_URL=$(curl -fsSL \
-                    https://api.github.com/repos/hashicorp/terraform-ls/releases/latest \
-                    | grep -Eo "https://[^\"]*terraform-ls_[^\"]*${TFLS_SUFFIX}" \
+                    https://api.github.com/repos/opentofu/tofu-ls/releases/latest \
+                    | grep -Eo "https://[^\"]*tofu-ls${TFLS_SUFFIX}" \
                     | head -n1)
                 if [ -z "${TFLS_URL:-}" ]; then
-                    warn "Could not find terraform-ls$TFLS_SUFFIX in latest release; skipping"
+                    warn "Could not find tofu-ls$TFLS_SUFFIX in latest release; skipping"
                 else
                     mkdir -p "$HOME/.local/bin"
                     TFLS_TMP=$(mktemp -d)
                     step "Downloading $TFLS_URL"
-                    curl -fsSL "$TFLS_URL" -o "$TFLS_TMP/terraform-ls.zip"
-                    step "Unzipping terraform-ls"
-                    unzip -o -q "$TFLS_TMP/terraform-ls.zip" terraform-ls -d "$HOME/.local/bin"
-                    chmod +x "$HOME/.local/bin/terraform-ls"
+                    curl -fsSL "$TFLS_URL" -o "$TFLS_TMP/tofu-ls.tar.gz"
+                    step "Extracting tofu-ls"
+                    tar -xzf "$TFLS_TMP/tofu-ls.tar.gz" -C "$TFLS_TMP" tofu-ls
+                    install -m 0755 "$TFLS_TMP/tofu-ls" "$HOME/.local/bin/tofu-ls"
                     rm -rf "$TFLS_TMP"
-                    ok "terraform-ls installed to ~/.local/bin"
+                    ok "tofu-ls installed to ~/.local/bin"
                     case ":${PATH:-}:" in
                         *":$HOME/.local/bin:"*) ;;
                         *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
@@ -421,7 +419,7 @@ else
                 fi
             fi
             ;;
-        *) skip "terraform-ls" ;;
+        *) skip "tofu-ls" ;;
     esac
 fi
 
