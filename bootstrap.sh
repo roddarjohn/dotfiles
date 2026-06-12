@@ -16,8 +16,9 @@
 #   7. regal (Rego language server)       (optional, prompted)
 #   8. tofu-ls (OpenTofu/Terraform LSP)   (optional, prompted)
 #   9. terragrunt-ls (Terragrunt LSP)     (optional, prompted)
-#  10. mise (runtime/tool manager)        (optional, prompted)
-#  11. syncthing                          (optional, prompted)
+#  10. copilot-language-server            (optional, prompted; needs npm)
+#  11. mise (runtime/tool manager)        (optional, prompted)
+#  12. syncthing                          (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -472,8 +473,34 @@ else
     esac
 fi
 
-# ── 10. mise — runtime / tool version manager (optional) ──────────────
-section "10. mise (optional)"
+# ── 10. copilot-language-server — Copilot for copilot.el (optional) ───
+# Installs into the directory copilot.el's `copilot-install-dir'
+# expects, mirroring what M-x copilot-install-server does. Auth
+# (~/.config/github-copilot) is separate: run M-x copilot-login once
+# per GitHub account if needed.
+section "10. copilot-language-server (optional)"
+COPILOT_DIR="$HOME/.emacs.d/.cache/copilot"
+if [ -x "$COPILOT_DIR/bin/copilot-language-server" ]; then
+    skip "copilot-language-server already at $COPILOT_DIR/bin"
+else
+    read -r -p "Install copilot-language-server (for copilot.el) via npm? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            if ! command -v npm >/dev/null 2>&1; then
+                warn "npm not found (install node, e.g. via nvm) — skipping copilot-language-server"
+            else
+                step "npm install @github/copilot-language-server into $COPILOT_DIR"
+                mkdir -p "$COPILOT_DIR"
+                npm -g --prefix "$COPILOT_DIR" install @github/copilot-language-server
+                ok "copilot-language-server installed to $COPILOT_DIR/bin"
+            fi
+            ;;
+        *) skip "copilot-language-server" ;;
+    esac
+fi
+
+# ── 11. mise — runtime / tool version manager (optional) ──────────────
+section "11. mise (optional)"
 if [ -x "$HOME/.local/bin/mise" ] || command -v mise >/dev/null 2>&1; then
     skip "mise already installed"
 else
@@ -496,8 +523,8 @@ else
     esac
 fi
 
-# ── 11. syncthing (optional) ──────────────────────────────────────────
-section "11. syncthing (optional)"
+# ── 12. syncthing (optional) ──────────────────────────────────────────
+section "12. syncthing (optional)"
 syncthing_already_enabled() {
     if [ "$PLATFORM" = "linux" ]; then
         systemctl --user is-enabled syncthing.service >/dev/null 2>&1

@@ -1364,16 +1364,27 @@ I don't fully use this right now. Perhaps I should.
   ;; `project-current' to decide where to spawn the LSP server, so
   ;; without this it launches zuban / typescript-language-server at
   ;; the repo root and they fail to find their config.
+  ;;
+  ;; Vendored trees are excluded: every package in node_modules ships
+  ;; its own package.json, so without the guard a go-to-definition
+  ;; that lands in a library .d.ts would root a project -- and spawn a
+  ;; full tsserver session -- inside node_modules.
+  (defvar my/project-vendored-dir-re
+    "/\\(?:node_modules\\|site-packages\\|\\.venv\\)/"
+    "Regexp matching vendored/library trees that never define a project root.")
+
   (defun my/project-try-manifest (dir)
     "Find LSP-relevant project root by walking up from DIR for manifests."
-    (when-let* ((root (locate-dominating-file
-                       dir
-                       (lambda (d)
-                         (seq-some
-                          (lambda (f) (file-exists-p (expand-file-name f d)))
-                          '("pyproject.toml" "package.json" "tsconfig.json"
-                            ".regal" ".terraform.lock.hcl"))))))
-      (cons 'transient (expand-file-name root))))
+    (unless (string-match-p my/project-vendored-dir-re
+                            (file-name-as-directory (expand-file-name dir)))
+      (when-let* ((root (locate-dominating-file
+                         dir
+                         (lambda (d)
+                           (seq-some
+                            (lambda (f) (file-exists-p (expand-file-name f d)))
+                            '("pyproject.toml" "package.json" "tsconfig.json"
+                              ".regal" ".terraform.lock.hcl"))))))
+        (cons 'transient (expand-file-name root)))))
 
   (add-hook 'project-find-functions #'my/project-try-manifest -90)
 
@@ -1495,14 +1506,21 @@ dependency).")
   (add-hook 'eglot-managed-mode-hook
             (lambda () (eglot-inlay-hints-mode -1)))
 
-  (add-hook 'python-mode-hook 'eglot-ensure)
-  (add-hook 'python-ts-mode-hook 'eglot-ensure)
-  (add-hook 'js-ts-mode-hook 'eglot-ensure)
-  (add-hook 'typescript-ts-mode-hook 'eglot-ensure)
-  (add-hook 'tsx-ts-mode-hook 'eglot-ensure)
-  (add-hook 'css-mode-hook 'eglot-ensure)
-  (add-hook 'css-ts-mode-hook 'eglot-ensure)
-  (add-hook 'just-ts-mode-hook 'eglot-ensure)
+  ;; Vendored/library files (node_modules, site-packages) are read-only
+  ;; navigation targets; starting a server for them just burns memory.
+  (defun my/eglot-ensure-unless-vendored ()
+    (unless (and buffer-file-name
+                 (string-match-p my/project-vendored-dir-re buffer-file-name))
+      (eglot-ensure)))
+
+  (add-hook 'python-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'python-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'js-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'typescript-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'tsx-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'css-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'css-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'just-ts-mode-hook 'my/eglot-ensure-unless-vendored)
 
   ;; jinja-shadow-lsp: attach to real jinja file buffers, and only when
   ;; the server has actually been installed via `uv sync' in
