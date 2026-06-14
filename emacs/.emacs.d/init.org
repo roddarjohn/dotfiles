@@ -1014,9 +1014,12 @@ I don't fully use this right now. Perhaps I should.
 
 ** format on save
    Project-aware: walks up from the buffer to find a formatter
-   config and invokes the matching tool over stdin. No-ops silently
-   when no config is found, so opening a JS/TS file in a project
-   that doesn't ship a formatter doesn't surprise you.
+   config and invokes the matching tool over stdin. When no config
+   file is present, falls back to a formatter the project /installs/
+   (=node_modules/.bin/=) -- e.g. prettier driven only by package.json
+   scripts, with no standalone =.prettierrc=. No-ops silently when the
+   project neither configures nor installs a formatter, so opening a
+   JS/TS file in a project that doesn't ship one doesn't surprise you.
 
 #+begin_src emacs-lisp
   (defvar js-ts-biome-configs '("biome.json" "biome.jsonc"))
@@ -1043,8 +1046,21 @@ I don't fully use this right now. Perhaps I should.
     (let ((local (expand-file-name (concat "node_modules/.bin/" tool) root)))
       (if (file-executable-p local) local tool)))
 
+  (defun js-ts--find-bin-root (tool)
+    "Walk up from the buffer for a dir installing TOOL in node_modules/.bin.
+  Returns that directory, or nil."
+    (let ((start (or (and buffer-file-name (file-name-directory buffer-file-name))
+                     default-directory)))
+      (locate-dominating-file
+       start
+       (lambda (d)
+         (file-executable-p
+          (expand-file-name (concat "node_modules/.bin/" tool) d))))))
+
   (defun js-ts--detect-formatter ()
-    "Return (CMD ARGS...) for the project's formatter, or nil."
+    "Return (CMD ARGS...) for the project's formatter, or nil.
+  Prefers an explicit config file; otherwise falls back to a formatter
+  the project installs as a dependency (used with its built-in defaults)."
     (let ((file (or (buffer-file-name) "buffer.tsx")))
       (cond
        ((when-let ((root (js-ts--find-config-root js-ts-biome-configs)))
@@ -1055,6 +1071,16 @@ I don't fully use this right now. Perhaps I should.
             "--stdin-filepath" ,file)))
        ((when-let ((root (js-ts--find-config-root js-ts-dprint-configs)))
           `(,(js-ts--resolve-bin root "dprint")
+            "fmt" "--stdin" ,file)))
+       ;; No standalone config: honour a formatter the project installs.
+       ((when-let ((root (js-ts--find-bin-root "biome")))
+          `(,(expand-file-name "node_modules/.bin/biome" root)
+            "format" "--stdin-file-path" ,file)))
+       ((when-let ((root (js-ts--find-bin-root "prettier")))
+          `(,(expand-file-name "node_modules/.bin/prettier" root)
+            "--stdin-filepath" ,file)))
+       ((when-let ((root (js-ts--find-bin-root "dprint")))
+          `(,(expand-file-name "node_modules/.bin/dprint" root)
             "fmt" "--stdin" ,file))))))
 
   (defun js-ts-format-buffer ()
@@ -1352,6 +1378,43 @@ I don't fully use this right now. Perhaps I should.
 #+end_src
 
 * eglot setup
+** performance
+   Eglot/tsserver feel slow or "crash a lot" mostly for two reasons,
+   both addressed here:
+
+   - Emacs reads subprocess output in tiny chunks by default
+     (=read-process-output-max=) and logs every JSON-RPC message into a
+     per-server events buffer (=eglot-events-buffer-config=). tsserver is
+     extremely chatty, so both throttle the UI. We widen the read buffer
+     and stop logging events.
+   - tsserver gets killed when its program graph blows past Node's heap.
+     The =maxTsServerMemory= init option (set on the server entry below)
+     raises that ceiling so it stops dying mid-session.
+
+   See =* eglot setup= notes: a project that pulls a sibling package in
+   *from source* (e.g. a =tsconfig= that =include=s another package's
+   =src= instead of its built =dist/*.d.ts=) multiplies tsserver's
+   program size -- that is a project-side fix, not an editor one.
+
+#+begin_src emacs-lisp
+  ;; LSP servers stream large payloads; the 4 KiB default (and even the
+  ;; 64 KiB Emacs 30 default) forces many small reads. 4 MiB is plenty.
+  (setq read-process-output-max (* 4 1024 1024))
+
+  ;; Don't mirror every JSON-RPC message into a buffer. The events log is
+  ;; only useful when actively debugging a server; for daily use it is
+  ;; pure overhead with a chatty server like tsserver. Toggle back on per
+  ;; session with `eglot-events-buffer' if a server misbehaves.
+  (setq eglot-events-buffer-config '(:size 0 :format full))
+
+  ;; Quiet the steady stream of work-done progress notifications.
+  (setq eglot-report-progress nil)
+
+  ;; Cold-loading a large TS program can take a while; give the initial
+  ;; handshake more room before eglot reports a failed connection.
+  (setq eglot-connect-timeout 120)
+#+end_src
+
 ** eglot
 #+begin_src emacs-lisp
   (require 'transient)
@@ -1477,9 +1540,17 @@ dependency).")
                  '((python-mode python-ts-mode) . my/zuban-eglot-contact))
     (add-to-list 'eglot-server-programs
                  '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
+    ;; maxTsServerMemory (MiB): raise tsserver's Node heap so a large
+    ;; program graph doesn't OOM-kill it mid-session. useSyntaxServer
+    ;; "auto" offloads syntax-only work (formatting, folding) to a light
+    ;; second process, keeping the semantic server responsive.
     (add-to-list 'eglot-server-programs
                  '((js-ts-mode typescript-ts-mode tsx-ts-mode)
-                   . ("typescript-language-server" "--stdio")))
+                   . ("typescript-language-server" "--stdio"
+                      :initializationOptions
+                      (:hostInfo "emacs"
+                       :tsserver (:maxTsServerMemory 4096
+                                  :useSyntaxServer "auto")))))
     (add-to-list 'eglot-server-programs
                  '((css-mode css-ts-mode)
                    . ("vscode-css-language-server" "--stdio")))
