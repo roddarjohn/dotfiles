@@ -1,0 +1,9 @@
+{
+  "theme": "dark",
+  "packages": [
+    "git:github.com/DietrichGebert/ponytail@v4.7.0",
+    "npm:pi-subagents",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@juicesharp/rpiv-todo"
+  ]
+}

@@ -9,3 +9,11 @@ emacs-config.el
 
 # TPM-managed tmux plugins
 tmux/.config/tmux/plugins/
+
+# pi skill/extension dependencies installed locally into the stowed dirs
+pi/.pi/agent/**/node_modules/
+pi/.pi/agent/**/__pycache__/
+pi/.pi/agent/**/.venv/
+# pi settings.json is edited in place via the symlink (e.g. by /settings); keep
+# it tracked, but ignore the runtime backup install.sh makes.
+pi/.pi/agent/settings.json.pre-stow.bak

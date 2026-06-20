@@ -14,7 +14,8 @@ cd ~/dotfiles
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
 running `install.sh`, and (optionally, with prompts) installing
 `jsonnet-language-server`, `regal`, `tofu-ls`, `terragrunt-ls`,
-`copilot-language-server`, `mise`, and `syncthing`. Each phase is idempotent, so
+`copilot-language-server`, `mise`, `syncthing`, and the `pi` coding agent
+CLI. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
 
@@ -92,7 +93,7 @@ cd ~/dotfiles
 
 The install script will:
 
-1. Symlink all config files into `$HOME` via stow (`zsh`, `tmux`, `emacs`)
+1. Symlink all config files into `$HOME` via stow (`zsh`, `tmux`, `emacs`, `bin`, `pi`)
 2. Install [tpm](https://github.com/tmux-plugins/tpm) (tmux plugin manager)
 3. Install the Meslo Nerd Font
 4. Configure the COSMIC Terminal font
@@ -119,13 +120,24 @@ Minimal `.zshrc` — sets Emacs as the editor and configures oh-my-zsh.
 ### tmux
 
 Configures key bindings and the [tmux-nova](https://github.com/o0th/tmux-nova)
-status line theme. Uses tpm for plugin management.
+status line theme. Uses tpm for plugin management. Also enables extended key
+reporting (`extended-keys on` / `extended-keys-format csi-u`) so modified keys
+like `Shift+Enter` survive inside the [pi](https://pi.dev) coding agent.
+
+### pi
+
+Config and resources for the [pi](https://pi.dev) coding agent, symlinked into
+`~/.pi/agent/` via stow. The `pi/.pi/agent/{skills,extensions,prompts,themes}/`
+directories are the drop-in points for installing skills, extensions, prompt
+templates, and themes — add a file or directory there and it's live. See
+[docs/pi.md](docs/pi.md) for the layout and how to add a skill or extension.
 
 ## Docs
 
 Additional guides live in `docs/`:
 
 - [`my-org-*` modules](docs/my-org-modules.md) — custom org layer for category-scoped capture/agenda, projects, and interview notes
+- [pi](docs/pi.md) — coding-agent config plus the symlink framework for installing skills, extensions, prompts, and themes
 - [Syncthing setup](docs/syncthing-setup.md) — peer-to-peer file sync across machines and Android
 
 ### LSP servers

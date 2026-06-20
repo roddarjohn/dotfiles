@@ -27,7 +27,20 @@ done
 rm -rf "$HOME/.emacs.d"
 mkdir -p "$HOME/.emacs.d"
 
-for pkg in zsh tmux emacs bin; do
+# Same reasoning for pi: pre-create the real ~/.pi/agent directory so stow folds
+# the resource subdirs (skills/, extensions/, prompts/, themes/) and settings.json
+# into individual symlinks, instead of replacing ~/.pi with one big symlink. That
+# keeps pi's runtime data (trust.json, auth.json, npm/, sessions) as real files
+# inside ~/.pi/agent rather than leaking into the dotfiles repo.
+mkdir -p "$HOME/.pi/agent"
+# If pi previously wrote its own settings.json, move it aside so stow can place
+# the tracked symlink without a conflict. Your old settings are kept as a .bak.
+if [ -f "$HOME/.pi/agent/settings.json" ] && [ ! -L "$HOME/.pi/agent/settings.json" ]; then
+    mv "$HOME/.pi/agent/settings.json" "$HOME/.pi/agent/settings.json.pre-stow.bak"
+    echo "  • existing pi settings.json backed up to settings.json.pre-stow.bak"
+fi
+
+for pkg in zsh tmux emacs bin pi; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
 done

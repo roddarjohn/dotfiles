@@ -9,4 +9,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: shellcheck install.sh
+      - name: Lint all shell scripts
+        run: git ls-files -z '*.sh' | xargs -0 -r shellcheck

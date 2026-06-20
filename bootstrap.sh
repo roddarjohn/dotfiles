@@ -19,6 +19,7 @@
 #  10. copilot-language-server            (optional, prompted; needs npm)
 #  11. mise (runtime/tool manager)        (optional, prompted)
 #  12. syncthing                          (optional, prompted)
+#  13. pi (coding agent CLI)              (optional, prompted; needs npm)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -326,7 +327,7 @@ else
                     ok "jsonnet-language-server installed to ~/.local/bin"
                     case ":${PATH:-}:" in
                         *":$HOME/.local/bin:"*) ;;
-                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                        *) warn "Add ~/.local/bin to your PATH to use the LSP" ;;
                     esac
                 fi
             fi
@@ -369,7 +370,7 @@ else
                     ok "regal installed to ~/.local/bin"
                     case ":${PATH:-}:" in
                         *":$HOME/.local/bin:"*) ;;
-                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                        *) warn "Add ~/.local/bin to your PATH to use the LSP" ;;
                     esac
                 fi
             fi
@@ -416,7 +417,7 @@ else
                     ok "tofu-ls installed to ~/.local/bin"
                     case ":${PATH:-}:" in
                         *":$HOME/.local/bin:"*) ;;
-                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                        *) warn "Add ~/.local/bin to your PATH to use the LSP" ;;
                     esac
                 fi
             fi
@@ -464,7 +465,7 @@ else
                     ok "terragrunt-ls installed to ~/.local/bin"
                     case ":${PATH:-}:" in
                         *":$HOME/.local/bin:"*) ;;
-                        *) warn "~/.local/bin is not on your PATH — add it to use the LSP" ;;
+                        *) warn "Add ~/.local/bin to your PATH to use the LSP" ;;
                     esac
                 fi
             fi
@@ -513,7 +514,7 @@ else
                 ok "mise installed to ~/.local/bin (activated in .zshrc)"
                 case ":${PATH:-}:" in
                     *":$HOME/.local/bin:"*) ;;
-                    *) warn "~/.local/bin is not on your PATH — add it to use mise" ;;
+                    *) warn "Add ~/.local/bin to your PATH to use mise" ;;
                 esac
             else
                 warn "mise install script finished but ~/.local/bin/mise not found"
@@ -556,6 +557,33 @@ else
     esac
 fi
 
+# ── 13. pi — coding agent CLI (optional) ──────────────────────────────
+# install.sh already linked pi's config and resources into ~/.pi/agent via
+# stow (skills/, extensions/, prompts/, themes/, settings.json); this phase
+# just installs the CLI itself. Auth is separate: run `pi` once afterwards
+# and follow the login prompts.
+section "13. pi (optional)"
+if command -v pi >/dev/null 2>&1; then
+    skip "pi already installed ($(command -v pi))"
+else
+    read -r -p "Install the pi coding agent CLI via npm? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            if ! command -v npm >/dev/null 2>&1; then
+                warn "npm not found (install node, e.g. via nvm) — skipping pi"
+            else
+                step "npm install -g @earendil-works/pi-coding-agent"
+                if npm install -g @earendil-works/pi-coding-agent; then
+                    ok "pi installed; run 'pi' to authenticate"
+                else
+                    warn "npm install -g pi failed — you may need sudo or a user-writable npm prefix (e.g. via nvm)"
+                fi
+            fi
+            ;;
+        *) skip "pi" ;;
+    esac
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────
 section "All done"
 cat <<'EOF'
@@ -567,5 +595,7 @@ Manual follow-ups (not automated):
   * First Emacs launch will clone and build all straight.el packages
     (a few minutes). Subsequent launches are fast.
   * Syncthing UI is at http://localhost:8384 (only if you enabled it).
+  * Run `pi` once to authenticate; its config and skills are already
+    linked into ~/.pi/agent via stow.
 
 EOF
