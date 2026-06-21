@@ -20,7 +20,7 @@ Surface meaningful issues / questions.
 
 If invoked in a git repository, the assumption is you are to fix it for this git repository.
 
-If you are in a fsh-stack, you are to recurisvely do this for each of the repositories.
+If you are in a fsh-stack, you are to recurisvely do this for each of the repositories.  Only do this recursively if the repository you're invoked in is the root, e.g. if you're in python-lib DO NOT recurse, only recurse if you're in e.g. fsh/.
 
 Please do not forget to also update the targets default versions, that's super important so that future generated apps aren't behind.
 
