@@ -8,11 +8,9 @@
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:@juicesharp/rpiv-todo",
     "npm:pi-subagents",
-    "npm:pi-long-task",
     "npm:pi-lens",
     "npm:pi-crew",
     "npm:@quintinshaw/pi-dynamic-workflows",
-    "npm:pi-agent-browser-native",
     "npm:pi-playwright"
   ],
   "lastChangelogVersion": "0.79.9"
