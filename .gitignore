@@ -24,3 +24,4 @@ pi/.pi/agent/settings.json.pre-stow.bak
 # pi-crew redeploys all bundled themes here on startup; keep dir, ignore files.
 # Theme choice lives in settings.json.
 pi/.pi/agent/themes/*.json
+pi/.pi/agent/extensions/**
