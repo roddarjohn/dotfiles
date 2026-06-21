@@ -23,4 +23,6 @@ If invoked in a git repository, the assumption is you are to fix it for this git
 If you are in a fsh-stack, you are to recurisvely do this for each of the repositories.
 
 Please do not forget to also update the targets default versions, that's super important so that future generated apps aren't behind.
+
+You can aggressively parallelize this per dependency PR using crew.
   
