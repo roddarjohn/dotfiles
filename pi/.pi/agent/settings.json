@@ -1,9 +1,13 @@
 {
   "theme": "dark",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-4-8",
+  "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
     "npm:pi-subagents",
     "npm:@juicesharp/rpiv-ask-user-question",
-    "npm:@juicesharp/rpiv-todo"
+    "npm:@juicesharp/rpiv-todo",
+    "npm:pi-playwright"
   ]
 }
