@@ -1,13 +1,19 @@
 {
-  "theme": "dark",
+  "theme": "crew-solarized-dark",
   "defaultProvider": "anthropic",
   "defaultModel": "claude-opus-4-8",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
-    "npm:pi-subagents",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:@juicesharp/rpiv-todo",
+    "npm:pi-subagents",
+    "npm:pi-long-task",
+    "npm:pi-lens",
+    "npm:pi-crew",
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "npm:pi-agent-browser-native",
     "npm:pi-playwright"
-  ]
+  ],
+  "lastChangelogVersion": "0.79.9"
 }

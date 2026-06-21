@@ -17,3 +17,10 @@ pi/.pi/agent/**/.venv/
 # pi settings.json is edited in place via the symlink (e.g. by /settings); keep
 # it tracked, but ignore the runtime backup install.sh makes.
 pi/.pi/agent/settings.json.pre-stow.bak
+
+# pi-crew runtime state (metrics, audit logs)
+.crew/
+
+# pi-crew redeploys all bundled themes here on startup; keep dir, ignore files.
+# Theme choice lives in settings.json.
+pi/.pi/agent/themes/*.json
