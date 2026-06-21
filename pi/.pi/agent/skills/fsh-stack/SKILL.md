@@ -25,7 +25,7 @@ Always edit the templates and not the outputs, and then regenerate.
 
 ---
 
-## 1. Broken venvs — the two failure modes
+## Dependency issues
 
 These are the most common time-sinks. Both look like "the package is broken"; neither is.
 
@@ -64,7 +64,7 @@ Run be tests with `PYTHONPATH=.`.
 
 ---
 
-## 2. OPA permissions / authz stack
+## Permissions / authz stack
 
 Spans three sources:
 
@@ -109,17 +109,9 @@ routing). Keep `--ignore '*_test.rego'`; gate the image with `opa test` +
 `opa eval --fail` replays. (Old template comments claimed the opposite — don't
 trust them.)
 
-**Alembic autogen is broken in codegen-example-app:** on the live DB,
-`sqlalchemy_declarative_extensions` chokes on pgqueuer's TRUNCATE trigger; on a
-clean scratch DB it emits a rebuild of _every_ view in dependency-unsafe order.
-Workflow: autogen on a scratch DB, then hand-trim the revision to the intended
-objects. `CodegenDatabaseForeignKey("users.id")` works regardless of model
-import order since codegen-database PR #26 (deferred FK resolution); older
-published codegen-database needs the three-part raw-table FK form.
-
 ---
 
-## 3. The publish / release chain (CI red ≠ your bug)
+## The publish / release chain (CI red ≠ your bug)
 
 Each layer's CI is red until the layer **below it is _published_** (release-please
 `chore(<pkg>): release X` PR merged), not merely merged to main. Local dev hides
@@ -147,7 +139,9 @@ bump the app's pin whenever components-library bumps react-router.
 
 ---
 
-## 4. codegen-example-app dev gotchas
+## codegen-example-app dev gotchas
+
+This applies to any app generated in this way.
 
 **Judge perf on `yarn preview`, not `yarn dev`.** Runtime is healthy (zero >50ms
 long tasks, soft navs ~120ms, BE search 18–120ms). All perceived lag is dev-mode
@@ -187,3 +181,15 @@ pgrep -af "pgq run"    # expect exactly one tree after restart
 saved-views (same-page tab strip expects a refresh). Fixed in
 example-app/be/main.py (2026-06-17); the `be_root` `main.py.j2` template likely
 still ships the gap — fix it there for every generated app.
+
+---
+
+## justfiles and merges
+
+The just files are insanely useful
+
+You should largely not be running any commands directly and instead relying on what's in the just files.
+
+We use just-pm (just-package-manager) to sync packages.  You can invoke this by running just-pm sync.  Many justfiles have just sync bound to this.
+
+Things like relinearizing database migrations, putting a database up, managing it, can all be done via just.  Putting up the dev servers can be done with just d.  just d <offset> allows you to create a new stack in a place that doesn't conflict.
