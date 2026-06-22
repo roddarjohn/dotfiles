@@ -7,11 +7,9 @@
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:@juicesharp/rpiv-todo",
-    "npm:pi-subagents",
     "npm:pi-lens",
-    "npm:pi-crew",
-    "npm:@quintinshaw/pi-dynamic-workflows",
-    "npm:pi-playwright"
+    "npm:pi-playwright",
+    "npm:@quintinshaw/pi-dynamic-workflows"
   ],
-  "lastChangelogVersion": "0.79.9"
+  "lastChangelogVersion": "0.79.10"
 }
