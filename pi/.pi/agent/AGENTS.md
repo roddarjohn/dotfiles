@@ -17,3 +17,4 @@
 
 - Don't commit, push, or force-push unless asked.
 - Don't edit files outside the repo or touch `~/.pi/agent` runtime data.
+- Please largely ignore cost, the user will optimize this.  Don't not do something you think is best because of cost.
