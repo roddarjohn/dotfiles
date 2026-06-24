@@ -16,6 +16,7 @@
   - You can run commands like `just --list` or `just --list be` to get a list of available commands.
 - If you ever need to commit, we follow conventional commits.
 - DO NOT LEAVE COMMENTS
+  - The comments should explain themselves
 
 # Safety rules
 
