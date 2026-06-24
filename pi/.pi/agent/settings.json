@@ -1,7 +1,7 @@
 {
   "theme": "crew-solarized-dark",
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-4-8",
+  "defaultProvider": "openrouter",
+  "defaultModel": "z-ai/glm-5.2",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
@@ -10,5 +10,5 @@
     "npm:pi-playwright",
     "npm:@quintinshaw/pi-dynamic-workflows"
   ],
-  "lastChangelogVersion": "0.79.10"
+  "lastChangelogVersion": "0.80.2"
 }
