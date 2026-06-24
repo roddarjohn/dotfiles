@@ -15,6 +15,7 @@
 - Please prefer using justfiles (and makefiles if they're around) instead of manually running ruff.  Some of these libraries will use `just-pm`, which is a package manager for `just`, that requires a `just-pm sync` before invoking recipes.
   - You can run commands like `just --list` or `just --list be` to get a list of available commands.
 - If you ever need to commit, we follow conventional commits.
+- DO NOT LEAVE COMMENTS
 
 # Safety rules
 
