@@ -1,7 +1,7 @@
 {
   "theme": "ansi-dark",
   "defaultProvider": "anthropic",
-  "defaultModel": "claude-opus-4.8",
+  "defaultModel": "claude-opus-4-8",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
