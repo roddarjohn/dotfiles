@@ -1,14 +1,15 @@
 {
-  "theme": "crew-solarized-dark",
-  "defaultProvider": "openrouter",
-  "defaultModel": "z-ai/glm-5.2",
+  "theme": "ansi-dark",
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-opus-4.8",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
     "npm:@juicesharp/rpiv-ask-user-question",
     "npm:@juicesharp/rpiv-todo",
     "npm:pi-playwright",
-    "npm:@quintinshaw/pi-dynamic-workflows"
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "git:github.com/leblancfg/pi-ansi-themes"
   ],
-  "lastChangelogVersion": "0.80.2"
+  "lastChangelogVersion": "0.80.3"
 }
