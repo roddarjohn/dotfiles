@@ -1356,6 +1356,12 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (require 'transient)
 
+  ;; Performance tuning for large repos / monorepos.
+  (setq read-process-output-max (* 1024 1024)
+        eglot-events-buffer-config '(:size 0 :format full)
+        eglot-sync-connect 1
+        eglot-autoshutdown t)
+
   ;; Monorepo-aware project root: when a buffer lives under a
   ;; directory that contains a language-specific manifest
   ;; (pyproject.toml, package.json, tsconfig.json, .regal,
@@ -1473,6 +1479,10 @@ dependency).")
       (list :servers servers)))
 
   (with-eval-after-load 'eglot
+    ;; documentHighlight re-requests every occurrence of the symbol at point
+    ;; on each cursor idle -- costly in large files, and the highlights aren't
+    ;; surfaced here anyway.
+    (add-to-list 'eglot-ignored-server-capabilities :documentHighlightProvider)
     (add-to-list 'eglot-server-programs
                  '((python-mode python-ts-mode) . my/zuban-eglot-contact))
     (add-to-list 'eglot-server-programs
