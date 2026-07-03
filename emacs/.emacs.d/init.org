@@ -83,6 +83,17 @@
   (scroll-bar-mode -1)
 #+end_src
 
+** gcmh
+   Raise the GC threshold during activity and collect only when idle,
+   so bursts of consing (LSP payloads, completion) don't trigger a GC
+   pause mid-keystroke.
+#+begin_src emacs-lisp
+  (use-package gcmh
+    :init (setq gcmh-idle-delay 'auto
+                gcmh-high-cons-threshold (* 128 1024 1024))
+    :config (gcmh-mode 1))
+#+end_src
+
 ** nuke-trailing-whitespace
 
 #+begin_src emacs-lisp
