@@ -5,12 +5,10 @@ plugins=(git)
 
 source $ZSH/oh-my-zsh.sh  # intentionally fails if not found
 
-# if on ssh, use emacs -nw; if not, use emacs
-if [[ -n $SSH_CONNECTION ]]; then
-  export EDITOR='emacs -nw'
-else
-  export EDITOR='emacs'
-fi
+# Attach to the shared Emacs daemon in this terminal; -a '' auto-starts it
+# on first use, so every git commit / $EDITOR call lands in the same Emacs.
+export EDITOR='emacsclient -a "" -nw'
+alias e='emacsclient -a "" -nw'
 
 # important for emacs
 export PATH=/usr/local/bin:$PATH

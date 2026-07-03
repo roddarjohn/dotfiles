@@ -1,11 +1,25 @@
 #!/bin/sh
 # /usr/local/bin/emacs symlinks into Emacs.app, which breaks Emacs's own
 # self-location (lisp/libexec resolve relative to /usr/local/bin and fail).
-# Exec the real bundle binary directly so it finds its install root.
+# So run the real bundle binary directly, and route interactive edits into
+# the shared daemon via emacsclient. Daemon/batch/debug flags stay standalone.
 app=/Applications/Emacs.app/Contents/MacOS/Emacs
-[ -x "$app" ] && exec "$app" "$@"
+client=/Applications/Emacs.app/Contents/MacOS/bin/emacsclient
 
-# Non-macOS: hand off to the next emacs on PATH, skipping this wrapper.
+if [ -x "$app" ]; then
+	for a in "$@"; do
+		case "$a" in
+		--batch | -batch | --script | -l | --load | --eval | \
+			--daemon | --bg-daemon=* | --fg-daemon | --fg-daemon=* | \
+			-Q | --quick | -q | --no-init-file | --version | --help)
+			exec "$app" "$@"
+			;;
+		esac
+	done
+	exec "$client" -a '' -nw "$@"
+fi
+
+# Non-macOS: defer to the next emacs on PATH, skipping this wrapper.
 IFS=:
 for d in $PATH; do
 	[ "$d" = "$HOME/.local/bin" ] && continue
