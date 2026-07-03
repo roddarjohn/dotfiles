@@ -581,7 +581,7 @@ Project management in emacs
   (use-package projectile
     :ensure t
     :config
-    (projectile-global-mode)
+    (projectile-mode +1)
     (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map))
 
   (use-package consult-projectile
@@ -866,7 +866,7 @@ I don't fully use this right now. Perhaps I should.
 
 * mu4e
 ** root setup
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle no
   (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e")  
   (require 'mu4e)
 

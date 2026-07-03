@@ -212,11 +212,9 @@ else
 
     EMACS_SRC=/opt/emacs
 
-    if [ ! -d "$EMACS_SRC" ]; then
-        step "Creating $EMACS_SRC (owned by $USER)"
-        sudo mkdir -p "$EMACS_SRC"
-        sudo chown "$USER:$USER" "$EMACS_SRC"
-    fi
+    step "Creating $EMACS_SRC (owned by $USER)"
+    sudo mkdir -p "$EMACS_SRC"
+    sudo chown "$USER:$(id -gn)" "$EMACS_SRC"
 
     if [ ! -d "$EMACS_SRC/.git" ]; then
         step "Cloning emacs-mirror/emacs ($EMACS_BRANCH) over HTTPS"
