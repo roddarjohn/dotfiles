@@ -40,6 +40,14 @@ if [ -f "$HOME/.pi/agent/settings.json" ] && [ ! -L "$HOME/.pi/agent/settings.js
     echo "  • existing pi settings.json backed up to settings.json.pre-stow.bak"
 fi
 
+# macOS ships neither ~/.config nor ~/.local, so at stow time they're absent and
+# stow folds each whole subtree into a single symlink (~/.config -> tmux/.config,
+# ~/.local -> bin/.local). Every runtime write then lands inside this repo: the
+# yarn link registry, uv/mise data, gh state, even copilot auth. Pre-create them
+# real so stow links individual files instead -- a no-op on Linux, where the OS
+# already provides these dirs (which is why it only misbehaves on macOS).
+mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share" "$HOME/.local/state"
+
 for pkg in zsh tmux emacs bin pi; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
