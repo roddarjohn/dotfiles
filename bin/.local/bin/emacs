@@ -1,0 +1,15 @@
+#!/bin/sh
+# /usr/local/bin/emacs symlinks into Emacs.app, which breaks Emacs's own
+# self-location (lisp/libexec resolve relative to /usr/local/bin and fail).
+# Exec the real bundle binary directly so it finds its install root.
+app=/Applications/Emacs.app/Contents/MacOS/Emacs
+[ -x "$app" ] && exec "$app" "$@"
+
+# Non-macOS: hand off to the next emacs on PATH, skipping this wrapper.
+IFS=:
+for d in $PATH; do
+	[ "$d" = "$HOME/.local/bin" ] && continue
+	[ -x "$d/emacs" ] && exec "$d/emacs" "$@"
+done
+echo "emacs: no runnable emacs found on PATH" >&2
+exit 127
