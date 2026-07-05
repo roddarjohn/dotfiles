@@ -299,13 +299,21 @@ go to the next page, previous page, or enable docstrings.
    #+END_SRC
 
 ** theme
+   flatland sets =diff-added= / =diff-removed= =:background= to nil, which
+   Emacs 30 rejects with a warning. Rewrite nil colour values to
+   =unspecified= while the theme loads, then drop the advice.
   #+begin_src emacs-lisp
+    (defun my/face-attr-nil->unspecified (args)
+      (cons (car args)
+            (cons (cadr args)
+                  (mapcar (lambda (x) (if (null x) 'unspecified x)) (cddr args)))))
+
     (use-package flatland-theme
       :ensure t
       :config
-      (load-theme 'flatland t)
-      (set-face-attribute 'diff-added nil :background 'unspecified)
-      (set-face-attribute 'diff-removed nil :background 'unspecified))
+      (advice-add 'set-face-attribute :filter-args #'my/face-attr-nil->unspecified)
+      (unwind-protect (load-theme 'flatland t)
+        (advice-remove 'set-face-attribute #'my/face-attr-nil->unspecified)))
   #+end_src
 
   #+RESULTS:
@@ -1114,7 +1122,7 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (use-package jsonnet-mode
     :mode "\\.jsonnet\\'"
-    :hook (jsonnet-mode . eglot-ensure))
+    :hook (jsonnet-mode . my/eglot-ensure-maybe))
 #+end_src
 
 * rego
@@ -1126,7 +1134,7 @@ I don't fully use this right now. Perhaps I should.
 #+begin_src emacs-lisp
   (use-package rego-mode
     :mode "\\.rego\\'"
-    :hook (rego-mode . eglot-ensure))
+    :hook (rego-mode . my/eglot-ensure-maybe))
 #+end_src
 
 * terraform / hcl
@@ -1164,12 +1172,12 @@ I don't fully use this right now. Perhaps I should.
   (add-to-list 'auto-mode-alist '("\\.terraform\\.lock\\.hcl\\'" . hcl-mode))
   (add-to-list 'auto-mode-alist '("\\.tflint\\.hcl\\'" . hcl-mode))
 
-  (add-hook 'terragrunt-mode-hook #'eglot-ensure)
+  (add-hook 'terragrunt-mode-hook #'my/eglot-ensure-maybe)
 
   (use-package terraform-mode
     :mode ("\\.tf\\'" "\\.tfvars\\'")
     :custom (terraform-command "tofu")
-    :hook ((terraform-mode . eglot-ensure)
+    :hook ((terraform-mode . my/eglot-ensure-maybe)
            (terraform-mode . terraform-format-on-save-mode)))
 #+end_src
 
@@ -1530,21 +1538,53 @@ dependency).")
   (add-hook 'eglot-managed-mode-hook
             (lambda () (eglot-inlay-hints-mode -1)))
 
-  ;; Vendored/library files (node_modules, site-packages) are read-only
-  ;; navigation targets; starting a server for them just burns memory.
-  (defun my/eglot-ensure-unless-vendored ()
-    (unless (and buffer-file-name
-                 (string-match-p my/project-vendored-dir-re buffer-file-name))
+  ;; Only attach a server when it makes sense.  Three guards:
+  ;;  - real on-disk file: skips magit revision buffers like
+  ;;    `foo.tsx.~{index}~', which otherwise trip "Can't guess mode to manage";
+  ;;  - not a vendored tree (node_modules, site-packages): read-only
+  ;;    navigation targets, a server there just burns memory;
+  ;;  - the configured server program is installed: several servers are
+  ;;    optional in bootstrap.sh, and a missing binary warns on every open.
+  (defun my/eglot-server-available-p ()
+    "Non-nil when the eglot server for this buffer's mode is usable.
+Looks up `eglot-server-programs' for the current major mode.  A plain
+command list must have its program on PATH; function and absolute-path
+contacts carry their own guards, so they are allowed."
+    (require 'eglot)
+    (let ((contact
+           (catch 'hit
+             (dolist (entry eglot-server-programs)
+               (let ((modes (car entry)))
+                 (when (seq-some
+                        (lambda (m)
+                          (provided-mode-derived-p
+                           major-mode (if (consp m) (car m) m)))
+                        (if (listp modes) modes (list modes)))
+                   (throw 'hit (cdr entry))))))))
+      (cond ((null contact) nil)
+            ((functionp contact) t)
+            ((and (consp contact) (stringp (car contact)))
+             (let ((prog (car contact)))
+               (or (file-name-absolute-p prog)
+                   (and (executable-find prog) t))))
+            (t t))))
+
+  (defun my/eglot-ensure-maybe ()
+    "Start eglot only for a real, non-vendored file with an installed server."
+    (when (and buffer-file-name
+               (file-exists-p buffer-file-name)
+               (not (string-match-p my/project-vendored-dir-re buffer-file-name))
+               (my/eglot-server-available-p))
       (eglot-ensure)))
 
-  (add-hook 'python-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'python-ts-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'js-ts-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'typescript-ts-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'tsx-ts-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'css-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'css-ts-mode-hook 'my/eglot-ensure-unless-vendored)
-  (add-hook 'just-ts-mode-hook 'my/eglot-ensure-unless-vendored)
+  (add-hook 'python-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'python-ts-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'js-ts-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'typescript-ts-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'tsx-ts-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'css-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'css-ts-mode-hook 'my/eglot-ensure-maybe)
+  (add-hook 'just-ts-mode-hook 'my/eglot-ensure-maybe)
 
   ;; jinja-shadow-lsp: attach to real jinja file buffers, and only when
   ;; the server has actually been installed via `uv sync' in
