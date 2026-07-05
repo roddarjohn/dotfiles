@@ -302,7 +302,10 @@ go to the next page, previous page, or enable docstrings.
   #+begin_src emacs-lisp
     (use-package flatland-theme
       :ensure t
-      :config (load-theme 'flatland t))
+      :config
+      (load-theme 'flatland t)
+      (set-face-attribute 'diff-added nil :background 'unspecified)
+      (set-face-attribute 'diff-removed nil :background 'unspecified))
   #+end_src
 
   #+RESULTS:
@@ -608,13 +611,13 @@ Project management in emacs
 - [[https://github.com/joaotavora/yasnippet][yasnippet]]
 
 #+BEGIN_SRC emacs-lisp
+  (use-package yasnippet-snippets
+    :ensure t)
+
   (use-package yasnippet
     :ensure t
     :config
     (yas-global-mode))
-
-  (use-package yasnippet-snippets
-    :ensure t)
 
 #+END_SRC
 
@@ -1564,6 +1567,7 @@ dependency).")
     :hook (prog-mode . copilot-mode)
     :config
     (setq copilot-indent-offset-warning-disable t)
+    (setq copilot-max-char-warning-disable t)
     :bind (:map copilot-completion-map
                 ("<tab>" . copilot-accept-completion)
                 ("TAB" . copilot-accept-completion)
