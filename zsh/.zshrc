@@ -7,8 +7,8 @@ source $ZSH/oh-my-zsh.sh  # intentionally fails if not found
 
 # Attach to the shared Emacs daemon in this terminal; -a '' auto-starts it
 # on first use, so every git commit / $EDITOR call lands in the same Emacs.
-export EDITOR='emacsclient -a "" -nw'
-alias e='emacsclient -a "" -nw'
+export EDITOR='emacs'
+alias e='emacs'
 
 # important for emacs
 export PATH=/usr/local/bin:$PATH
