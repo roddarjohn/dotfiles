@@ -1,7 +1,19 @@
 {
-  "theme": "dark-daltonized",
-  "ultracode": true,
   "permissions": {
     "defaultMode": "auto"
-  }
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "ponytail@ponytail": true
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    }
+  },
+  "ultracode": true,
+  "theme": "dark-daltonized"
 }
