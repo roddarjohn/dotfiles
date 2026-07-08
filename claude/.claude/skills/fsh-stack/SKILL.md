@@ -157,21 +157,6 @@ blocks reloads with a "Leave site?" dialog (froze Playwright). Dev also fills th
 250-entry resource-timing buffer — `performance.clearResourceTimings()` before
 measuring.
 
-**Async reports serve stale code until you restart the worker.** A _sync_ report
-runs in the uvicorn `--reload` web process (auto-picks up regenerated
-`_generated/reports.py`); an _async_ report runs in the separate pgqueuer worker
-(`just be queue worker` → `uv run pgq run tracker.queue.main:main`), which does
-**not** reload. After a regen, sync shows new output, async shows old.
-`fuser -k <port>` and `pkill -f "queue worker"` do **not** kill it (it holds no
-TCP port; real process name is `pgq run ...`, the `queue worker` match is just
-the `just` wrapper). Orphaned `pgq run` procs from a previous `just dev` keep
-draining the same queue and can grab a fresh stack's job.
-
-```bash
-pkill -f "pgq run"
-pgrep -af "pgq run"    # expect exactly one tree after restart
-```
-
 **X-Invalidate-Queries silently no-ops cross-origin** unless BE CORS sets
 `expose_headers=["X-Invalidate-Queries"]`. Server-driven cache invalidation (FE
 `api/invalidation.ts` reads the header → `queryClient.invalidateQueries`) gets
