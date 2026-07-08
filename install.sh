@@ -49,10 +49,17 @@ fi
 mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share" "$HOME/.local/state"
 
 # Same reasoning again for Claude Code: pre-create the real ~/.claude directory so
-# stow links only the tracked entries (CLAUDE.md, skills/) into it, leaving Claude's
-# own runtime data (sessions, cache, settings.json, history) as real files. The
-# claude/ package is generated from pi/ by scripts/sync-claude-from-pi.sh.
+# stow links only the tracked entries (CLAUDE.md, skills/, settings.json) into it,
+# leaving Claude's own runtime data (sessions, cache, history) as real files. Most of
+# the claude/ package is generated from pi/ by scripts/sync-claude-from-pi.sh;
+# settings.json is the one hand/Claude-maintained file, edited in place via the symlink.
 mkdir -p "$HOME/.claude"
+# If Claude previously wrote its own settings.json, move it aside so stow can place
+# the tracked symlink without a conflict. Your old settings are kept as a .bak.
+if [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" ]; then
+    mv "$HOME/.claude/settings.json" "$HOME/.claude/settings.json.pre-stow.bak"
+    echo "  • existing claude settings.json backed up to settings.json.pre-stow.bak"
+fi
 
 for pkg in zsh tmux emacs bin pi claude; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"

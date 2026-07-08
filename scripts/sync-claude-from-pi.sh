@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Regenerate the Claude Code stow package (claude/.claude/) from the pi harness
 # config (pi/.pi/agent/). pi is the single source of truth; everything under
-# claude/.claude/ is generated and should never be hand-edited.
+# claude/.claude/ is generated and should never be hand-edited — except
+# settings.json, which is Claude-specific, tracked, and edited in place.
 #
 # What it converts:
 #   pi/.pi/agent/AGENTS.md        -> claude/.claude/CLAUDE.md   (global user memory)
 #   pi/.pi/agent/skills/<name>/   -> claude/.claude/skills/<name>/
+#
+# settings.json is NOT generated: it's Claude-specific config (no pi analogue for
+# keys like permissions.defaultMode), tracked in the repo and stowed as a symlink so
+# Claude's /config edits it in place. It's left untouched here and skipped by --check.
 #
 # pi and Claude Code both use the agentskills.io SKILL.md format, so skills copy
 # across verbatim. (Claude Code requires each skill's frontmatter `name:` to match
@@ -83,7 +88,7 @@ fi
 
 # ── check mode: diff scratch build vs committed tree ─────────────────────────
 if [ "$CHECK_ONLY" -eq 1 ]; then
-    if ! diff -r "$OUT" "$DEST" >/dev/null 2>&1; then
+    if ! diff -r --exclude=settings.json "$OUT" "$DEST" >/dev/null 2>&1; then
         echo "✗ claude/.claude is stale; run: scripts/sync-claude-from-pi.sh" >&2
         exit 1
     fi
