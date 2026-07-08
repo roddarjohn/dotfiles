@@ -23,3 +23,14 @@
 - Don't commit, push, or force-push unless asked.
 - Don't edit files outside the repo or touch `~/.pi/agent` runtime data.
 - Please largely ignore cost, the user will optimize this.  Don't not do something you think is best because of cost.
+
+# Workflow instructions
+
+- Please be mindful of which models you're having do which tasks
+- Guidelines:
+  - Sonnet: best for summary, exploration, very simple / easily verifiable changes
+  - Opus: best for the heavy work, medium in intelligence
+  - Fable: very very smart. Best for coordination, review, planning
+- Common patterns:
+  - Explore using sonnet, execute using Opus, review using Fable
+  - Workflows should almost always have a verify step that loops the execution until it's satisfied or you exceed retries
