@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Keep claude/.claude/ in sync with the pi harness config. When a commit touches
+# anything under pi/.pi/agent/, regenerate the Claude Code package and stage it
+# so the two never drift.
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Only bother when pi source is part of this commit.
+if git diff --cached --name-only | grep -q '^pi/\.pi/agent/'; then
+    "$REPO_ROOT/scripts/sync-claude-from-pi.sh"
+    git add "$REPO_ROOT/claude/.claude"
+fi

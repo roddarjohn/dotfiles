@@ -48,10 +48,19 @@ fi
 # already provides these dirs (which is why it only misbehaves on macOS).
 mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share" "$HOME/.local/state"
 
-for pkg in zsh tmux emacs bin pi; do
+# Same reasoning again for Claude Code: pre-create the real ~/.claude directory so
+# stow links only the tracked entries (CLAUDE.md, skills/) into it, leaving Claude's
+# own runtime data (sessions, cache, settings.json, history) as real files. The
+# claude/ package is generated from pi/ by scripts/sync-claude-from-pi.sh.
+mkdir -p "$HOME/.claude"
+
+for pkg in zsh tmux emacs bin pi claude; do
     stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
 done
+
+# Route git hooks at the tracked .githooks/ dir so the pi -> claude sync runs on commit.
+git -C "$DOTFILES_DIR" config core.hooksPath .githooks
 
 # ── TPM ────────────────────────────────────────────────────────────────────────
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
