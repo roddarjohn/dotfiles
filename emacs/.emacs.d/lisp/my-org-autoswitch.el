@@ -46,10 +46,30 @@
                                'help-echo "Projectile project"))))))
 (put 'my/projectile-mode-line-segment 'risky-local-variable t)
 
+(defvar-local my/mode-line--lines-cache nil
+  "Cons (TICK . TOTAL) caching the buffer's total line count, keyed by
+`buffer-chars-modified-tick' so we rescan only after the text changes.")
+
+(defun my/mode-line--total-lines ()
+  "Total line count, recomputed only when the buffer text has changed."
+  (let ((tick (buffer-chars-modified-tick)))
+    (if (eq (car my/mode-line--lines-cache) tick)
+        (cdr my/mode-line--lines-cache)
+      (cdr (setq my/mode-line--lines-cache
+                 (cons tick (line-number-at-pos (point-max))))))))
+
+(defvar my/mode-line-line-position
+  '(:eval (let* ((total (my/mode-line--total-lines))
+                 (cur (line-number-at-pos))
+                 (pct (if (> total 0) (/ (* 100 cur) total) 0)))
+            (format "L%d / %d (%d%%)" cur total pct)))
+  "Modeline segment: current line, total lines, percent through file.")
+(put 'my/mode-line-line-position 'risky-local-variable t)
+
 (defvar my/org-minimal-mode-line-format
   '("%e" " "
     mode-line-buffer-identification
-    "  L%l  "
+    "  " my/mode-line-line-position "  "
     "(" mode-name ")"
     my/projectile-mode-line-segment
     my/org-current-project-mode-line-segment)
