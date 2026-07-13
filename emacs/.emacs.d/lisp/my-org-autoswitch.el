@@ -48,7 +48,7 @@
 
 (defvar my/mode-line-total-position
   '(:eval (let ((total (line-number-at-pos (point-max))))
-            (format " / %d (%d%%)"
+            (format " / %d (%d%%%%)"
                     total
                     (if (> total 0) (/ (* 100 (line-number-at-pos)) total) 0))))
   "Modeline segment: total line count and percent of file above point.
