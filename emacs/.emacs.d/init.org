@@ -1439,66 +1439,30 @@ I don't fully use this right now. Perhaps I should.
       ("E" "Events buffer"    eglot-events-buffer)
       ("L" "Stderr buffer"    eglot-stderr-buffer)]])
 
-  ;; Run zuban inside the project's uv environment via `uv run',
-  ;; so the language server sees the project's dependencies
-  ;; (fastapi, sqlalchemy, ...).  `uvx' runs zuban in an isolated
-  ;; tool env containing only zuban itself, so every third-party
-  ;; import comes back unresolved.  `uv run' needs zuban to be a
-  ;; project dependency, though; when the project declares none we
-  ;; fall back to `uvx' (which always works) and warn that project
-  ;; deps will not resolve.
+  ;; Run zuban inside the project's uv environment via `uv run', so the
+  ;; language server sees the project's dependencies (fastapi, sqlalchemy,
+  ;; ...).  `uvx' runs zuban in an isolated tool env containing only zuban
+  ;; itself, so every third-party import comes back unresolved.  `uv run'
+  ;; needs zuban installed in the project's venv; detect that by the venv
+  ;; binary rather than grepping pyproject text -- a uv workspace root
+  ;; (`package = false', e.g. codegen-targets) declares its deps only in
+  ;; member packages, so the root text never mentions zuban even though
+  ;; `.venv/bin/zuban' is present.  Only when it is genuinely absent do we
+  ;; fall back to `uvx' (which always works) and warn that deps won't resolve.
   (defun my/zuban-eglot-contact (&optional _interactive)
     "Return the eglot server command for zuban.
 Prefer `uv run' so the server resolves project dependencies; fall
 back to an isolated `uvx' invocation -- with a warning in the
-*Messages* buffer -- when the project declares no zuban dep."
+*Messages* buffer -- when zuban is not installed in the project venv."
     (let* ((root (when-let* ((proj (project-current)))
                    (project-root proj)))
-           (pyproject (and root (expand-file-name "pyproject.toml" root)))
-           (has-zuban (and pyproject
-                           (file-exists-p pyproject)
-                           (with-temp-buffer
-                             (insert-file-contents pyproject)
-                             (goto-char (point-min))
-                             (re-search-forward "^\\s-*\"zuban" nil t)))))
-      (if has-zuban
+           (zuban (and root (expand-file-name ".venv/bin/zuban" root))))
+      (if (and zuban (file-executable-p zuban))
           '("uv" "run" "zuban" "server")
         (message
-         "[zuban] %s declares no zuban dependency; falling back to `uvx zuban' -- project deps (fastapi, sqlalchemy, ...) will NOT resolve"
+         "[zuban] %s has no zuban in .venv; falling back to `uvx zuban' -- project deps (fastapi, sqlalchemy, ...) will NOT resolve"
          (or root "this project"))
         '("uvx" "zuban" "server"))))
-
-  (defvar my/jinja-shadow-lsp-dir
-    (expand-file-name "workspace/dotfiles/jinja-shadow-lsp" "~")
-    "Project root of the jinja-shadow-lsp language server.")
-
-  (defun my/jinja-shadow-lsp-program ()
-    "Absolute path to the jinja-shadow-lsp executable in its uv venv."
-    (expand-file-name ".venv/bin/jinja-shadow-lsp" my/jinja-shadow-lsp-dir))
-
-  ;; jinja-shadow-lsp is host-agnostic: a single `jinja2-mode' entry handles
-  ;; every *.j2 file, and the server dispatches to the right downstream host
-  ;; server by the inner extension (foo.py.j2 -> python). To stay general,
-  ;; the downstream servers are data-driven here: add one line per host as
-  ;; shadow generators for more languages land (only python ships today).
-  (defvar my/jinja-shadow-downstream-servers
-    '((python . ["uv" "run" "zuban" "server"]))
-    "Alist of host language id (symbol) -> launch command (a vector).
-Passed to jinja-shadow-lsp as initializationOptions so it can forward a
-template's shadow to the underlying language server for its host. The
-command is spawned with cwd set to the project root, so `uv run' resolves
-the project venv (use [\"uvx\" \"zuban\" \"server\"] if zuban isn't a project
-dependency).")
-
-  (defun my/jinja-shadow-lsp-init-options ()
-    "Build jinja-shadow-lsp initializationOptions from the downstream alist."
-    (let (servers)
-      (dolist (pair my/jinja-shadow-downstream-servers)
-        (setq servers
-              (append servers
-                      (list (intern (format ":%s" (car pair)))
-                            (list :command (cdr pair))))))
-      (list :servers servers)))
 
   (with-eval-after-load 'eglot
     ;; documentHighlight re-requests every occurrence of the symbol at point
@@ -1523,11 +1487,6 @@ dependency).")
                  '(terraform-mode . ("tofu-ls" "serve")))
     (add-to-list 'eglot-server-programs
                  '(terragrunt-mode . ("terragrunt-ls")))
-    (add-to-list 'eglot-server-programs
-                 `((jinja2-mode jinja-ts-mode)
-                   . (,(my/jinja-shadow-lsp-program)
-                      :initializationOptions
-                      ,(my/jinja-shadow-lsp-init-options))))
     (keymap-set eglot-mode-map "C-c j"   #'eglot-code-actions)
     (keymap-set eglot-mode-map "C-c r"   #'eglot-rename)
     (keymap-set eglot-mode-map "C-c t"   #'eglot-find-typeDefinition)
@@ -1585,6 +1544,51 @@ contacts carry their own guards, so they are allowed."
   (add-hook 'css-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'css-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'just-ts-mode-hook 'my/eglot-ensure-maybe)
+#+end_src
+** jinja shadow lsp
+   Off by default. jinja-shadow-lsp proxies a Jinja template to its host
+   language server (=foo.py.j2= -> python) for syntax diagnostics. To
+   enable: =uv sync= in =my/jinja-shadow-lsp-dir=, flip the =:tangle=
+   header below to =emacs-config.el=, and re-tangle.
+#+begin_src emacs-lisp :tangle no
+  (defvar my/jinja-shadow-lsp-dir
+    (expand-file-name "workspace/dotfiles/jinja-shadow-lsp" "~")
+    "Project root of the jinja-shadow-lsp language server.")
+
+  (defun my/jinja-shadow-lsp-program ()
+    "Absolute path to the jinja-shadow-lsp executable in its uv venv."
+    (expand-file-name ".venv/bin/jinja-shadow-lsp" my/jinja-shadow-lsp-dir))
+
+  ;; jinja-shadow-lsp is host-agnostic: a single `jinja2-mode' entry handles
+  ;; every *.j2 file, and the server dispatches to the right downstream host
+  ;; server by the inner extension (foo.py.j2 -> python). To stay general,
+  ;; the downstream servers are data-driven here: add one line per host as
+  ;; shadow generators for more languages land (only python ships today).
+  (defvar my/jinja-shadow-downstream-servers
+    '((python . ["uv" "run" "zuban" "server"]))
+    "Alist of host language id (symbol) -> launch command (a vector).
+Passed to jinja-shadow-lsp as initializationOptions so it can forward a
+template's shadow to the underlying language server for its host. The
+command is spawned with cwd set to the project root, so `uv run' resolves
+the project venv (use [\"uvx\" \"zuban\" \"server\"] if zuban isn't a project
+dependency).")
+
+  (defun my/jinja-shadow-lsp-init-options ()
+    "Build jinja-shadow-lsp initializationOptions from the downstream alist."
+    (let (servers)
+      (dolist (pair my/jinja-shadow-downstream-servers)
+        (setq servers
+              (append servers
+                      (list (intern (format ":%s" (car pair)))
+                            (list :command (cdr pair))))))
+      (list :servers servers)))
+
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 `((jinja2-mode jinja-ts-mode)
+                   . (,(my/jinja-shadow-lsp-program)
+                      :initializationOptions
+                      ,(my/jinja-shadow-lsp-init-options)))))
 
   ;; jinja-shadow-lsp: attach to real jinja file buffers, and only when
   ;; the server has actually been installed via `uv sync' in
@@ -1600,7 +1604,12 @@ contacts carry their own guards, so they are allowed."
   (add-hook 'jinja-ts-mode-hook #'my/jinja-shadow-eglot-maybe)
 #+end_src
 ** copilot
-#+begin_src emacs-lisp
+   AI ghost-text completion. Copilot and TabNine are mutually exclusive
+   (both own an overlay =TAB= map), so enable exactly one: flip the two
+   =:tangle= headers below (=no= ↔ =emacs-config.el=) and re-tangle.
+   TabNine additionally needs a one-time =M-x tabnine-install-binary= to
+   fetch its engine.
+#+begin_src emacs-lisp :tangle no
   (use-package copilot
     :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
     :ensure t
@@ -1613,6 +1622,19 @@ contacts carry their own guards, so they are allowed."
                 ("TAB" . copilot-accept-completion)
                 ("C-<tab>" . copilot-accept-completion-by-word)
                 ("C-TAB" . copilot-accept-completion-by-word)))
+#+end_src
+** tabnine
+#+begin_src emacs-lisp :tangle emacs-config.el
+  (use-package tabnine
+    :straight (:host github :repo "shuxiao9058/tabnine" :files ("*.el"))
+    :ensure t
+    :commands (tabnine-start-process)
+    :hook (prog-mode . tabnine-mode)
+    :bind (:map tabnine-completion-map
+                ("<tab>" . tabnine-accept-completion)
+                ("TAB" . tabnine-accept-completion)
+                ("C-<tab>" . tabnine-accept-completion-by-word)
+                ("C-TAB" . tabnine-accept-completion-by-word)))
 #+end_src
 
 #+RESULTS:
