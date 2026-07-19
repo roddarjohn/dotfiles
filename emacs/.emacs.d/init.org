@@ -882,6 +882,8 @@ I don't fully use this right now. Perhaps I should.
 #+end_src
 ** text scale increase and decrease
 #+begin_src emacs-lisp
+  (set-face-attribute 'default nil
+                      :height (round (* (face-attribute 'default :height) (expt 1.2 -2))))
   (bind-key "C-=" 'text-scale-increase)
   (bind-key "C--" 'text-scale-decrease)
 #+end_src
