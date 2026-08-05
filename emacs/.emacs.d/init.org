@@ -881,12 +881,15 @@ I don't fully use this right now. Perhaps I should.
     (setq markdown-command "pandoc"))
 #+end_src
 ** text scale increase and decrease
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :tangle no
   (set-face-attribute 'default nil
-                      :height (round (* (face-attribute 'default :height) (expt 1.2 -2))))
+                      :height (round (* (face-attribute 'default :height) (expt 1.2))))
   (bind-key "C-=" 'text-scale-increase)
   (bind-key "C--" 'text-scale-decrease)
 #+end_src
+
+#+RESULTS:
+: text-scale-decrease
 
 * mu4e
 ** root setup
@@ -1606,12 +1609,62 @@ dependency).")
   (add-hook 'jinja2-mode-hook #'my/jinja-shadow-eglot-maybe)
   (add-hook 'jinja-ts-mode-hook #'my/jinja-shadow-eglot-maybe)
 #+end_src
+** minuet
+   The active AI ghost-text provider, wired to a *local* fill-in-the-middle
+   model — Qwen2.5-Coder 3B served by [[https://ollama.com][Ollama]] at
+   =http://localhost:11434=. A dedicated FIM code model on-device is what
+   makes suggestions Copilot-fast: no network hop, no per-token chat
+   latency (a chat model like Claude can't match it here). No API key — the
+   placeholder credential is a constant. One-time setup:
+   #+begin_example
+     brew install ollama            # or the Ollama.app
+     ollama pull qwen2.5-coder:3b
+   #+end_example
+   Ollama must be running (=ollama serve=, or the app) for suggestions to
+   appear. Drop to =qwen2.5-coder:1.5b= if the 3B feels heavy; grow
+   =minuet-context-window= past 512 once you know the machine keeps up.
+
+   Minuet and Copilot each own an overlay suggestion map and are mutually
+   exclusive; Minuet is the one tangled on and is the =prog-mode=
+   ghost-text provider.
+
+   Suggestions run automatically (=minuet-auto-suggestion-mode= on
+   =prog-mode=) — no manual trigger. The accept/cycle keys live in
+   =minuet-active-mode-map=, bound only while a suggestion is showing:
+   =TAB= accepts one line (press again for the next), =M-n= / =M-p= cycle
+   alternatives. =C-c M-i= toggles the auto mode off (and back on) in the
+   current buffer. =M-p= only shadows cape's prefix while ghost text is up;
+   with no suggestion active the map is dead and =M-p= is cape again.
+#+begin_src emacs-lisp
+  (use-package minuet
+    :ensure t
+    :hook (prog-mode . minuet-auto-suggestion-mode)
+    :bind (("C-c M-i" . minuet-auto-suggestion-mode)
+           :map minuet-active-mode-map
+           ("<tab>" . minuet-accept-suggestion-line)
+           ("TAB" . minuet-accept-suggestion-line)
+           ("M-n" . minuet-next-suggestion)
+           ("M-p" . minuet-previous-suggestion))
+    :config
+    (setq minuet-provider 'openai-fim-compatible
+          minuet-n-completions 1
+          minuet-context-window 2048
+          minuet-auto-suggestion-debounce-delay 0)
+    (plist-put minuet-openai-fim-compatible-options :name "Ollama")
+    (plist-put minuet-openai-fim-compatible-options
+               :end-point "http://localhost:11434/v1/completions")
+    (plist-put minuet-openai-fim-compatible-options :api-key (lambda () "ollama"))
+    (plist-put minuet-openai-fim-compatible-options :model "qwen2.5-coder:3b")
+    (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56))
+#+end_src
+
+#+RESULTS:
+: minuet-previous-suggestion
+
 ** copilot
-   AI ghost-text completion. Copilot and TabNine are mutually exclusive
-   (both own an overlay =TAB= map), so enable exactly one: flip the two
-   =:tangle= headers below (=no= ↔ =emacs-config.el=) and re-tangle.
-   TabNine additionally needs a one-time =M-x tabnine-install-binary= to
-   fetch its engine.
+   Alternate AI ghost-text provider, off by default. Mutually exclusive
+   with Minuet (both own an overlay =TAB= map) — to switch, tangle this on
+   (=no= → =emacs-config.el=), turn Minuet off, and re-tangle.
 #+begin_src emacs-lisp :tangle no
   (use-package copilot
     :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
@@ -1626,21 +1679,61 @@ dependency).")
                 ("C-<tab>" . copilot-accept-completion-by-word)
                 ("C-TAB" . copilot-accept-completion-by-word)))
 #+end_src
-** tabnine
-#+begin_src emacs-lisp :tangle emacs-config.el
-  (use-package tabnine
-    :straight (:host github :repo "shuxiao9058/tabnine" :files ("*.el"))
+** gptel
+   The gptel backend that =gptel-fn-complete= drives. Defaults to the
+   *local* Ollama =qwen3.6:35b-a3b=, so =C-c .= completions never leave the
+   machine. Claude stays registered as a second backend, selectable from
+   =M-x gptel-menu= for harder rewrites; it reads its key from =auth-source=
+   via =my/anthropic-api-key= (=machine api.anthropic.com= in =~/.authinfo=),
+   while Ollama needs none. =gptel-backend= / =gptel-model= set the default.
+   #+begin_example
+     machine api.anthropic.com login apikey password sk-ant-...
+   #+end_example
+#+begin_src emacs-lisp
+  (require 'auth-source)
+
+  (defvar my/anthropic-api-key--cache nil)
+
+  (defun my/anthropic-api-key ()
+    "Return the Anthropic API key from auth-source, memoised.
+  Looks up `machine api.anthropic.com' in `~/.authinfo'(.gpg)."
+    (or my/anthropic-api-key--cache
+        (setq my/anthropic-api-key--cache
+              (auth-source-pick-first-password :host "api.anthropic.com"))))
+
+  (use-package gptel
     :ensure t
-    :commands (tabnine-start-process)
-    :hook (prog-mode . tabnine-mode)
-    :bind (:map tabnine-completion-map
-                ("<tab>" . tabnine-accept-completion)
-                ("TAB" . tabnine-accept-completion)
-                ("C-<tab>" . tabnine-accept-completion-by-word)
-                ("C-TAB" . tabnine-accept-completion-by-word)))
+    :config
+    (gptel-make-anthropic "Claude"
+      :stream t
+      :key #'my/anthropic-api-key)
+    (setq gptel-backend
+          (gptel-make-ollama "Ollama"
+            :host "localhost:11434"
+            :stream t
+            :models '(qwen3.6:35b-a3b))
+          gptel-model 'qwen3.6:35b-a3b))
 #+end_src
 
-#+RESULTS:
+** gptel-fn-complete
+   "Complete the function at point" with gptel — local =qwen3.6= by
+   default (see the gptel block). Built on
+   =gptel-rewrite=. On MELPA, bound to =C-c .= (=C-.= / =C-;= are Embark,
+   so =C-c .= is free). Put point inside a function body and hit =C-c .=;
+   it completes/rewrites that function as a =gptel-rewrite= overlay, which
+   =C-c C-a= then accepts (=C-c C-k= rejects). Set
+   =gptel-rewrite-default-action= to =accept= to skip the overlay.
+
+   No =:after gptel=: it wrapped the =:bind= in gptel's load hook, but
+   nothing pulls gptel in at startup, so =C-c .= never got bound. =:bind*=
+   (not =:bind=) puts =C-c .= in the override map so no major mode can
+   shadow it; pressing it autoloads =gptel-fn-complete=, which =require='s
+   gptel (running its =:config= above) as it loads.
+#+begin_src emacs-lisp
+  (use-package gptel-fn-complete
+    :ensure t
+    :bind* ("C-c ." . gptel-fn-complete))
+#+end_src
 
 * org-mode setup
   The machinery lives in =lisp/my-org-*.el= (stow symlinks those into
