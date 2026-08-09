@@ -15,8 +15,8 @@
                     "input": [
                         "text"
                     ],
-                    "contextWindow": 262144,
-                    "maxTokens": 131072,
+                    "contextWindow": 131072,
+                    "maxTokens": 32768,
                     "compat": {
                         "thinkingFormat": "qwen-chat-template"
                     }

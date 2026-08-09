@@ -1,0 +1,19 @@
+FROM qwen3.6:35b-a3b
+
+# Qwen3 thinking-mode sampling (Qwen/unsloth recommendation).
+# temperature was 1 (too hot -> instability/loops); 0.6 is the documented value.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0
+
+# presence_penalty 1.5 is unsloth's anti-repetition default for the GGUF; kept.
+# If you see language-mixing / quality dips, lower toward 0. If loops persist, this is the knob.
+PARAMETER presence_penalty 1.5
+PARAMETER repeat_penalty 1
+
+# num_ctx was 262144. On a 51GB Mac that tips unified memory over budget and adds
+# ~10s of fixed overhead to EVERY request (measured: 10s -> 0.6s at 131072). 131072 is
+# the largest window with zero overhead. Keep pi's models.json contextWindow in sync.
+PARAMETER num_ctx 131072
+PARAMETER num_predict 32768
