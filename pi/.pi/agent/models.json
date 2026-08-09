@@ -9,8 +9,21 @@
             },
             "models": [
                 {
+                    "id": "qwen3.6:27b",
+                    "name": "Qwen3.6 27B (local, default — fits RAM)",
+                    "reasoning": true,
+                    "input": [
+                        "text"
+                    ],
+                    "contextWindow": 131072,
+                    "maxTokens": 32768,
+                    "compat": {
+                        "thinkingFormat": "qwen-chat-template"
+                    }
+                },
+                {
                     "id": "qwen3.6:35b-a3b",
-                    "name": "Qwen3.6 35B-A3B (local)",
+                    "name": "Qwen3.6 35B-A3B (local, needs free RAM)",
                     "reasoning": true,
                     "input": [
                         "text"

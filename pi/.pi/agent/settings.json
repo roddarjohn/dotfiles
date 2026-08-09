@@ -1,7 +1,7 @@
 {
   "theme": "ansi-dark",
   "defaultProvider": "ollama",
-  "defaultModel": "qwen3.6:35b-a3b",
+  "defaultModel": "qwen3.6:27b",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
