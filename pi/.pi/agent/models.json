@@ -9,8 +9,23 @@
             },
             "models": [
                 {
+                    "id": "muse-glimmer:30b-mlx",
+                    "name": "Muse Glimmer 30B (Meta, local MLX — default)",
+                    "reasoning": true,
+                    "input": [
+                        "text",
+                        "image"
+                    ],
+                    "contextWindow": 131072,
+                    "maxTokens": 32768,
+                    "compat": {
+                        "thinkingFormat": "qwen",
+                        "supportsReasoningEffort": true
+                    }
+                },
+                {
                     "id": "qwen3.6:27b",
-                    "name": "Qwen3.6 27B (local, default — fits RAM)",
+                    "name": "Qwen3.6 27B (local — fits RAM)",
                     "reasoning": true,
                     "input": [
                         "text"

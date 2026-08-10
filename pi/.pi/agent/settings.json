@@ -1,7 +1,7 @@
 {
   "theme": "ansi-dark",
   "defaultProvider": "ollama",
-  "defaultModel": "qwen3.6:27b",
+  "defaultModel": "muse-glimmer:30b-mlx",
   "defaultThinkingLevel": "xhigh",
   "packages": [
     "git:github.com/DietrichGebert/ponytail@v4.7.0",
