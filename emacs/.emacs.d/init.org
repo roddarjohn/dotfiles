@@ -1628,17 +1628,15 @@ dependency).")
    exclusive; Minuet is the one tangled on and is the =prog-mode=
    ghost-text provider.
 
-   Suggestions run automatically (=minuet-auto-suggestion-mode= on
-   =prog-mode=) — no manual trigger. The accept/cycle keys live in
-   =minuet-active-mode-map=, bound only while a suggestion is showing:
-   =TAB= accepts one line (press again for the next), =M-n= / =M-p= cycle
-   alternatives. =C-c M-i= toggles the auto mode off (and back on) in the
-   current buffer. =M-p= only shadows cape's prefix while ghost text is up;
+   Auto-suggestions are *off by default*; =C-c M-i= toggles
+   =minuet-auto-suggestion-mode= on (and off) in the current buffer. Once
+   on, the accept/cycle keys live in =minuet-active-mode-map=, bound only
+   while a suggestion is showing: =TAB= accepts one line (press again for
+   the next), =M-n= / =M-p= cycle alternatives. =M-p= only shadows cape's prefix while ghost text is up;
    with no suggestion active the map is dead and =M-p= is cape again.
 #+begin_src emacs-lisp
   (use-package minuet
     :ensure t
-    :hook (prog-mode . minuet-auto-suggestion-mode)
     :bind (("C-c M-i" . minuet-auto-suggestion-mode)
            :map minuet-active-mode-map
            ("<tab>" . minuet-accept-suggestion-line)
