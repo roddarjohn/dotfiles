@@ -78,8 +78,8 @@ mapping layer.
 ### `my-org-interview.el`
 Interview-style note taking. Defines the `:INTERVIEW_MODE:` subtree
 property, the capture template body that embeds it, and the buffer-
-local `my/org-interview-mode` that rebinds `C-<return>` inside such
-subtrees.
+local `my/org-interview-mode` that handles `C-<return>` and
+`M-<return>` inside such subtrees.
 
 - `my/org-interview-property` — `"INTERVIEW_MODE"`.
 - `my/org-interview-capture-template-body` — consumed by
@@ -88,6 +88,9 @@ subtrees.
   inserts a timestamped list item (`- HH:MM `) inside an
   `INTERVIEW_MODE` subtree, falls back to
   `org-insert-heading-respect-content` elsewhere.
+- `my/org-interview-meta-return` — mode-local `M-<return>` handler:
+  refreshes the generated timestamp at the start of the current note
+  line, falling back to `org-meta-return` elsewhere.
 - `my/org-interview-maybe-enable` — hook function; turns the mode on
   whenever the current buffer contains any `INTERVIEW_MODE` property
   line. Wired to both `org-mode-hook` (on-disk files) and
@@ -196,9 +199,10 @@ minimal modeline format used system-wide.
 
 ### `my/org-interview-mode` (buffer-local, auto-enabled)
 
-| Binding     | Command                       |
-|-------------|-------------------------------|
-| `C-<return>`| `my/org-interview-c-return`   |
+| Binding      | Command                         |
+|--------------|---------------------------------|
+| `C-<return>` | `my/org-interview-c-return`     |
+| `M-<return>` | `my/org-interview-meta-return`  |
 
 ### Org capture template keys
 

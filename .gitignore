@@ -30,3 +30,5 @@ pi/.pi/agent/extensions/**
 # ...except hand-authored extensions tracked with the dotfiles (not npm-installed):
 !pi/.pi/agent/extensions/qwen-loop-guard.ts
 !pi/.pi/agent/extensions/qwen-loop-guard.test.mjs
+
+.pi/**

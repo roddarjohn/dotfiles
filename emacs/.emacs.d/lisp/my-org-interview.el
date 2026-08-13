@@ -6,7 +6,8 @@
 ;; `my/org-interview-mode' binds `C-<return>' to a handler that
 ;; inserts a timestamped list item whenever point is inside a
 ;; subtree carrying that property (inherited), falling back to a
-;; normal heading elsewhere.
+;; normal heading elsewhere. `M-<return>' refreshes the timestamp
+;; on the current interview note line.
 ;;
 ;; The mode auto-enables in any org buffer (or capture buffer) that
 ;; contains at least one such subtree, via the hook function
@@ -61,9 +62,31 @@ anywhere else fall back to `org-insert-heading-respect-content'."
       (my/org-interview--insert-timestamped-item)
     (call-interactively #'org-insert-heading-respect-content)))
 
+(defun my/org-interview--timestamp-bounds ()
+  "Return the current line's generated timestamp bounds, or nil."
+  (save-excursion
+    (beginning-of-line)
+    (when (looking-at
+           "- \\([01][0-9]:[0-5][0-9]\\|2[0-3]:[0-5][0-9]\\) ")
+      (cons (match-beginning 1) (match-end 1)))))
+
+(defun my/org-interview-meta-return ()
+  "Refresh the current interview note timestamp or call `org-meta-return'."
+  (interactive)
+  (let ((bounds (and (my/org-interview--active-at-point-p)
+                     (my/org-interview--timestamp-bounds))))
+    (if bounds
+        (let ((position (point)))
+          (delete-region (car bounds) (cdr bounds))
+          (goto-char (car bounds))
+          (insert (format-time-string "%H:%M"))
+          (goto-char position))
+      (call-interactively #'org-meta-return))))
+
 (defvar my/org-interview-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-<return>") #'my/org-interview-c-return)
+    (define-key map (kbd "M-<return>") #'my/org-interview-meta-return)
     map)
   "Keymap for `my/org-interview-mode'.")
 
@@ -72,9 +95,10 @@ anywhere else fall back to `org-insert-heading-respect-content'."
   "Buffer-local mode for interview-style note taking.
 When enabled, \\[my/org-interview-c-return] checks the subtree at
 point for the INTERVIEW_MODE property and inserts a timestamped
-list item when it's set, or a normal heading otherwise. Normally
-auto-enabled by `my/org-interview-maybe-enable' when an org buffer
-contains any INTERVIEW_MODE subtree."
+list item when it's set, or a normal heading otherwise.
+\\[my/org-interview-meta-return] refreshes a generated note line's
+timestamp. Normally auto-enabled by `my/org-interview-maybe-enable'
+when an org buffer contains any INTERVIEW_MODE subtree."
   :lighter " Iv"
   :keymap my/org-interview-mode-map
   :group 'org)
