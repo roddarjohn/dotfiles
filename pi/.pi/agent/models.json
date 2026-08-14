@@ -24,8 +24,8 @@
                     }
                 },
                 {
-                    "id": "qwen3.6:27b",
-                    "name": "Qwen3.6 27B (local — fits RAM)",
+                    "id": "qwen3.8:27b",
+                    "name": "Qwen3.8 27B Q4_K_M (local — fits RAM)",
                     "reasoning": true,
                     "input": [
                         "text"

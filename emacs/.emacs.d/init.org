@@ -1609,61 +1609,16 @@ dependency).")
   (add-hook 'jinja2-mode-hook #'my/jinja-shadow-eglot-maybe)
   (add-hook 'jinja-ts-mode-hook #'my/jinja-shadow-eglot-maybe)
 #+end_src
-** minuet
-   The active AI ghost-text provider, wired to a *local* fill-in-the-middle
-   model — Qwen2.5-Coder 3B served by [[https://ollama.com][Ollama]] at
-   =http://localhost:11434=. A dedicated FIM code model on-device is what
-   makes suggestions Copilot-fast: no network hop, no per-token chat
-   latency (a chat model like Claude can't match it here). No API key — the
-   placeholder credential is a constant. One-time setup:
-   #+begin_example
-     brew install ollama            # or the Ollama.app
-     ollama pull qwen2.5-coder:3b
-   #+end_example
-   Ollama must be running (=ollama serve=, or the app) for suggestions to
-   appear. Drop to =qwen2.5-coder:1.5b= if the 3B feels heavy; grow
-   =minuet-context-window= past 512 once you know the machine keeps up.
-
-   Minuet and Copilot each own an overlay suggestion map and are mutually
-   exclusive; Minuet is the one tangled on and is the =prog-mode=
-   ghost-text provider.
-
-   Auto-suggestions are *off by default*; =C-c M-i= toggles
-   =minuet-auto-suggestion-mode= on (and off) in the current buffer. Once
-   on, the accept/cycle keys live in =minuet-active-mode-map=, bound only
-   while a suggestion is showing: =TAB= accepts one line (press again for
-   the next), =M-n= / =M-p= cycle alternatives. =M-p= only shadows cape's prefix while ghost text is up;
-   with no suggestion active the map is dead and =M-p= is cape again.
-#+begin_src emacs-lisp
-  (use-package minuet
-    :ensure t
-    :bind (("C-c M-i" . minuet-auto-suggestion-mode)
-           :map minuet-active-mode-map
-           ("<tab>" . minuet-accept-suggestion-line)
-           ("TAB" . minuet-accept-suggestion-line)
-           ("M-n" . minuet-next-suggestion)
-           ("M-p" . minuet-previous-suggestion))
-    :config
-    (setq minuet-provider 'openai-fim-compatible
-          minuet-n-completions 1
-          minuet-context-window 2048
-          minuet-auto-suggestion-debounce-delay 0)
-    (plist-put minuet-openai-fim-compatible-options :name "Ollama")
-    (plist-put minuet-openai-fim-compatible-options
-               :end-point "http://localhost:11434/v1/completions")
-    (plist-put minuet-openai-fim-compatible-options :api-key (lambda () "ollama"))
-    (plist-put minuet-openai-fim-compatible-options :model "qwen2.5-coder:3b")
-    (minuet-set-optional-options minuet-openai-fim-compatible-options :max_tokens 56))
-#+end_src
-
-#+RESULTS:
-: minuet-previous-suggestion
-
 ** copilot
-   Alternate AI ghost-text provider, off by default. Mutually exclusive
-   with Minuet (both own an overlay =TAB= map) — to switch, tangle this on
-   (=no= → =emacs-config.el=), turn Minuet off, and re-tangle.
-#+begin_src emacs-lisp :tangle no
+   AI ghost-text completion through the official
+   [[https://github.com/github/copilot-language-server-release][GitHub Copilot language server]].
+   =bootstrap.sh= can install the server into =copilot-install-dir=; otherwise
+   run =M-x copilot-install-server=. Run =M-x copilot-login= once to
+   authenticate and =M-x copilot-diagnose= to verify the setup. Copilot runs
+   automatically in programming buffers.
+   =TAB= accepts a suggestion and =C-TAB= accepts the next word while the
+   completion overlay is visible.
+#+begin_src emacs-lisp
   (use-package copilot
     :straight (:host github :repo "copilot-emacs/copilot.el" :files ("*.el"))
     :ensure t
