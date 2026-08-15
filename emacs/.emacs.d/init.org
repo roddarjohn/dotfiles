@@ -1456,10 +1456,20 @@ I don't fully use this right now. Perhaps I should.
                          :annotation-function
                          #'my/eglot-completion-annotation))))
 
+  (defvar-local my/eglot-saved-completion-at-point-functions nil)
+
   (defun my/eglot-managed-setup ()
     "Use only source-aware LSP completion in Eglot-managed buffers."
-    (setq-local completion-at-point-functions
-                (and (eglot-managed-p) '(my/eglot-completion-at-point)))
+    (if (eglot-managed-p)
+        (progn
+          (setq my/eglot-saved-completion-at-point-functions
+                (remove #'eglot-completion-at-point
+                        completion-at-point-functions))
+          (setq-local completion-at-point-functions
+                      '(my/eglot-completion-at-point)))
+      (setq-local completion-at-point-functions
+                  my/eglot-saved-completion-at-point-functions)
+      (kill-local-variable 'my/eglot-saved-completion-at-point-functions))
     (corfu-mode (if (eglot-managed-p) 1 -1))
     (eglot-inlay-hints-mode -1))
 
@@ -1517,12 +1527,13 @@ contacts carry their own guards, so they are allowed."
    nearest ancestor =.venv= so nested uv workspace packages resolve the shared
    environment correctly. Install the server with =uv tool install basedpyright=.
 #+begin_src emacs-lisp
-  (defun my/basedpyright-python-executable ()
-    "Return the project Python executable, preferring an ancestor .venv."
-    (let* ((root (when-let* ((proj (project-current)))
-                   (project-root proj)))
-           (venv-root (and root
-                           (locate-dominating-file root ".venv/bin/python")))
+  (defun my/basedpyright-python-executable (&optional dir)
+    "Return the Python executable for DIR, preferring an ancestor .venv."
+    (let* ((root (or dir
+                     (when-let* ((proj (project-current)))
+                       (project-root proj))
+                     default-directory))
+           (venv-root (locate-dominating-file root ".venv/bin/python"))
            (venv-python (and venv-root
                              (expand-file-name ".venv/bin/python" venv-root))))
       (or (and venv-python
@@ -1531,22 +1542,22 @@ contacts carry their own guards, so they are allowed."
           (executable-find "python3")
           (executable-find "python"))))
 
-  (defun my/basedpyright-eglot-setup ()
-    "Configure BasedPyright before starting Eglot in a Python buffer."
-    (when-let ((python (my/basedpyright-python-executable)))
-      (setq-local
-       eglot-workspace-configuration
-       `(:python (:pythonPath ,python)
-         :basedpyright.analysis (:autoImportCompletions t))))
-    (my/eglot-ensure-maybe))
+  (defun my/basedpyright-workspace-configuration (_server)
+    "Return project-rooted Eglot settings for BasedPyright."
+    (when-let ((python (my/basedpyright-python-executable default-directory)))
+      `(:python (:pythonPath ,python)
+        :basedpyright (:analysis (:autoImportCompletions t)))))
+
+  (setq-default eglot-workspace-configuration
+                #'my/basedpyright-workspace-configuration)
 
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
                  '((python-mode python-ts-mode)
                    . ("basedpyright-langserver" "--stdio"))))
 
-  (add-hook 'python-mode-hook #'my/basedpyright-eglot-setup)
-  (add-hook 'python-ts-mode-hook #'my/basedpyright-eglot-setup)
+  (add-hook 'python-mode-hook #'my/eglot-ensure-maybe)
+  (add-hook 'python-ts-mode-hook #'my/eglot-ensure-maybe)
 #+end_src
 ** zuban
    Inactive alternative to BasedPyright. To switch back, mark the BasedPyright
