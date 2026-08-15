@@ -1525,7 +1525,10 @@ contacts carry their own guards, so they are allowed."
    The active Python language server. BasedPyright supplies completion-menu
    auto-imports and their source modules. The Python interpreter comes from the
    nearest ancestor =.venv= so nested uv workspace packages resolve the shared
-   environment correctly. Install the server with =uv tool install basedpyright=.
+   environment correctly. Dynamic file watching is disabled for this server
+   because Eglot allocates one descriptor per project directory and can exceed
+   macOS's launchd descriptor limit in generated repositories. Install the
+   server with =uv tool install basedpyright=.
 #+begin_src emacs-lisp
   (defun my/basedpyright-python-executable (&optional dir)
     "Return the Python executable for DIR, preferring an ancestor .venv."
@@ -1552,9 +1555,20 @@ contacts carry their own guards, so they are allowed."
                 #'my/basedpyright-workspace-configuration)
 
   (with-eval-after-load 'eglot
+    (defclass my/basedpyright-eglot-server (eglot-lsp-server) ())
+
+    (cl-defmethod eglot-client-capabilities
+      ((server my/basedpyright-eglot-server))
+      (let ((capabilities (cl-call-next-method)))
+        (setf (plist-get (plist-get capabilities :workspace)
+                         :didChangeWatchedFiles)
+              '(:dynamicRegistration :json-false))
+        capabilities))
+
     (add-to-list 'eglot-server-programs
                  '((python-mode python-ts-mode)
-                   . ("basedpyright-langserver" "--stdio"))))
+                   my/basedpyright-eglot-server
+                   "basedpyright-langserver" "--stdio")))
 
   (add-hook 'python-mode-hook #'my/eglot-ensure-maybe)
   (add-hook 'python-ts-mode-hook #'my/eglot-ensure-maybe)
