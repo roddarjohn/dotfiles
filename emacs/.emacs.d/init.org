@@ -347,36 +347,21 @@ go to the next page, previous page, or enable docstrings.
 
 #+RESULTS:
 ** corfu
-- need to fix whack popup issue
-
+   Corfu is enabled only in Eglot-managed buffers. The Eglot setup below
+   restricts its completion backend to the LSP so candidates can carry edits
+   such as TypeScript auto-imports.
 #+begin_src emacs-lisp
   (use-package corfu
-    ;; Optional customizations
-    ;; :custom
-    ;; (corfu-cycle t)                ;; Enable cycling for `corfu-next/previous'
-    ;; (corfu-quit-at-boundary nil)   ;; Never quit at completion boundary
-    ;; (corfu-quit-no-match nil)      ;; Never quit, even if there is no match
-    ;; (corfu-preview-current nil)    ;; Disable current candidate preview
-    ;; (corfu-preselect 'prompt)      ;; Preselect the prompt
-    ;; (corfu-on-exact-match 'insert) ;; Configure handling of exact matches
-
-    ;; Enable Corfu only for certain modes. See also `global-corfu-modes'.
-    ;; :hook ((prog-mode . corfu-mode)
-    ;;        (shell-mode . corfu-mode)
-    ;;        (eshell-mode . corfu-mode))
-
     :ensure t
-
     :init
     (setq corfu-auto t
-    	  corfu-auto-delay 0.2
-    	  corfu-auto-trigger "." ;; Custom trigger characters
-    	  corfu-quit-no-match 'separator
-  	corfu-max-width 80) ;; or t  
+          corfu-auto-delay 0.2
+          corfu-auto-trigger "."
+          corfu-quit-no-match 'separator
+          corfu-max-width 80)
+    :config
+    (global-corfu-mode -1))
 
-    (global-corfu-mode))
-
-  ;; A few more useful configurations...
   (use-package emacs
     :custom
     (completion-cycle-threshold 3)
@@ -384,34 +369,6 @@ go to the next page, previous page, or enable docstrings.
     (text-mode-ispell-word-completion nil)
     (read-extended-command-predicate #'command-completion-default-include-p))
 #+end_src
-
-#+RESULTS:
-: t
-
-** cape
-- figure this one out a little more
-#+begin_src emacs-lisp
-  (use-package cape
-    ;; Bind prefix keymap providing all Cape commands under a mnemonic key.
-    ;; Press C-c p ? to for help.
-    :ensure t
-    :bind ("M-p" . cape-prefix-map) ;; Alternative key: M-<tab>, M-p, M-+
-    :init
-    ;; Add to the global default value of `completion-at-point-functions' which is
-    ;; used by `completion-at-point'.  The order of the functions matters, the
-    ;; first function returning a result wins.  Note that the list of buffer-local
-    ;; completion functions takes precedence over the global list.
-    (add-hook 'completion-at-point-functions #'cape-dabbrev)
-    (add-hook 'completion-at-point-functions #'cape-file)
-    (add-hook 'completion-at-point-functions #'cape-elisp-block)
-    (add-hook 'completion-at-point-functions #'cape-dict)
-    ;; (add-hook 'completion-at-point-functions #'cape-history)
-    ;; ...
-  )
-#+end_src
-
-#+RESULTS:
-: cape-prefix-map
 
 ** consult
 
@@ -1500,8 +1457,14 @@ back to an isolated `uvx' invocation -- with a warning in the
     (keymap-set eglot-mode-map "C-c h"   #'eglot-inlay-hints-mode)
     (keymap-set eglot-mode-map "C-c l"   #'my/eglot-transient))
 
-  (add-hook 'eglot-managed-mode-hook
-            (lambda () (eglot-inlay-hints-mode -1)))
+  (defun my/eglot-managed-setup ()
+    "Use only LSP completion while Eglot manages the current buffer."
+    (setq-local completion-at-point-functions
+                (and (eglot-managed-p) '(eglot-completion-at-point)))
+    (corfu-mode (if (eglot-managed-p) 1 -1))
+    (eglot-inlay-hints-mode -1))
+
+  (add-hook 'eglot-managed-mode-hook #'my/eglot-managed-setup)
 
   ;; Only attach a server when it makes sense.  Three guards:
   ;;  - real on-disk file: skips magit revision buffers like
