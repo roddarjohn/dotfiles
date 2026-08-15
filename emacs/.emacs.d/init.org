@@ -1352,7 +1352,7 @@ I don't fully use this right now. Perhaps I should.
   ;; .terraform.lock.hcl), prefer that
   ;; directory over the enclosing .git root.  Eglot uses
   ;; `project-current' to decide where to spawn the LSP server, so
-  ;; without this it launches zuban / typescript-language-server at
+  ;; without this it launches the Python / TypeScript language server at
   ;; the repo root and they fail to find their config.
   ;;
   ;; Vendored trees are excluded: every package in node_modules ships
@@ -1429,10 +1429,37 @@ I don't fully use this right now. Perhaps I should.
     (keymap-set eglot-mode-map "C-c h"   #'eglot-inlay-hints-mode)
     (keymap-set eglot-mode-map "C-c l"   #'my/eglot-transient))
 
+  (defun my/eglot-completion-annotation (candidate)
+    "Describe CANDIDATE using its LSP detail and source module."
+    (when-let ((item (get-text-property 0 'eglot--lsp-item candidate)))
+      (let* ((detail (plist-get item :detail))
+             (source (plist-get (plist-get item :labelDetails) :description))
+             (parts (delete-dups
+                     (seq-filter
+                      (lambda (text)
+                        (and (stringp text) (not (string-empty-p text))))
+                      (list detail source))))
+             (annotation
+              (if parts
+                  (string-join parts " · ")
+                (cdr (assoc (plist-get item :kind) eglot--kind-names)))))
+        (when annotation
+          (concat " "
+                  (propertize annotation
+                              'face 'font-lock-function-name-face))))))
+
+  (defun my/eglot-completion-at-point ()
+    "Return Eglot completion with source-aware menu annotations."
+    (when-let ((capf (eglot-completion-at-point)))
+      (append (seq-take capf 3)
+              (plist-put (copy-sequence (nthcdr 3 capf))
+                         :annotation-function
+                         #'my/eglot-completion-annotation))))
+
   (defun my/eglot-managed-setup ()
-    "Use only LSP completion while Eglot manages the current buffer."
+    "Use only source-aware LSP completion in Eglot-managed buffers."
     (setq-local completion-at-point-functions
-                (and (eglot-managed-p) '(eglot-completion-at-point)))
+                (and (eglot-managed-p) '(my/eglot-completion-at-point)))
     (corfu-mode (if (eglot-managed-p) 1 -1))
     (eglot-inlay-hints-mode -1))
 
