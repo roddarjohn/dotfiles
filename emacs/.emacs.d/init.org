@@ -1401,39 +1401,11 @@ I don't fully use this right now. Perhaps I should.
       ("E" "Events buffer"    eglot-events-buffer)
       ("L" "Stderr buffer"    eglot-stderr-buffer)]])
 
-  ;; Run zuban inside the project's uv environment via `uv run', so the
-  ;; language server sees the project's dependencies (fastapi, sqlalchemy,
-  ;; ...).  `uvx' runs zuban in an isolated tool env containing only zuban
-  ;; itself, so every third-party import comes back unresolved.  `uv run'
-  ;; needs zuban installed in the venv, so gate on the venv binary -- but
-  ;; search UP for it: `my/project-try-manifest' roots the project at the
-  ;; nearest pyproject.toml, which in a uv workspace (e.g. codegen-targets)
-  ;; is a `packages/*' member with no `.venv' of its own; the shared venv
-  ;; lives at the workspace root above it, which is exactly where `uv run'
-  ;; resolves it too.  Only when no ancestor has `.venv/bin/zuban' do we
-  ;; fall back to `uvx' (which always works) and warn that deps won't resolve.
-  (defun my/zuban-eglot-contact (&optional _interactive)
-    "Return the eglot server command for zuban.
-Prefer `uv run' so the server resolves project dependencies; fall
-back to an isolated `uvx' invocation -- with a warning in the
-*Messages* buffer -- when zuban is not installed in the project venv."
-    (let* ((root (when-let* ((proj (project-current)))
-                   (project-root proj)))
-           (venv-root (and root (locate-dominating-file root ".venv/bin/zuban"))))
-      (if venv-root
-          '("uv" "run" "zuban" "server")
-        (message
-         "[zuban] no synced .venv with zuban above %s -- run `just sync' at the codegen-targets root (authenticate to CodeArtifact first if it 401s); falling back to `uvx zuban', project deps (fastapi, sqlalchemy, ...) will NOT resolve"
-         (or root "this project"))
-        '("uvx" "zuban" "server"))))
-
   (with-eval-after-load 'eglot
     ;; documentHighlight re-requests every occurrence of the symbol at point
     ;; on each cursor idle -- costly in large files, and the highlights aren't
     ;; surfaced here anyway.
     (add-to-list 'eglot-ignored-server-capabilities :documentHighlightProvider)
-    (add-to-list 'eglot-server-programs
-                 '((python-mode python-ts-mode) . my/zuban-eglot-contact))
     (add-to-list 'eglot-server-programs
                  '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
     (add-to-list 'eglot-server-programs
@@ -1505,14 +1477,77 @@ contacts carry their own guards, so they are allowed."
                (my/eglot-server-available-p))
       (eglot-ensure)))
 
-  (add-hook 'python-mode-hook 'my/eglot-ensure-maybe)
-  (add-hook 'python-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'js-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'typescript-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'tsx-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'css-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'css-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'just-ts-mode-hook 'my/eglot-ensure-maybe)
+#+end_src
+** basedpyright
+   The active Python language server. BasedPyright supplies completion-menu
+   auto-imports and their source modules. The Python interpreter comes from the
+   nearest ancestor =.venv= so nested uv workspace packages resolve the shared
+   environment correctly. Install the server with =uv tool install basedpyright=.
+#+begin_src emacs-lisp
+  (defun my/basedpyright-python-executable ()
+    "Return the project Python executable, preferring an ancestor .venv."
+    (let* ((root (when-let* ((proj (project-current)))
+                   (project-root proj)))
+           (venv-root (and root
+                           (locate-dominating-file root ".venv/bin/python")))
+           (venv-python (and venv-root
+                             (expand-file-name ".venv/bin/python" venv-root))))
+      (or (and venv-python
+               (file-executable-p venv-python)
+               venv-python)
+          (executable-find "python3")
+          (executable-find "python"))))
+
+  (defun my/basedpyright-eglot-setup ()
+    "Configure BasedPyright before starting Eglot in a Python buffer."
+    (when-let ((python (my/basedpyright-python-executable)))
+      (setq-local
+       eglot-workspace-configuration
+       `(:python (:pythonPath ,python)
+         :basedpyright.analysis (:autoImportCompletions t))))
+    (my/eglot-ensure-maybe))
+
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '((python-mode python-ts-mode)
+                   . ("basedpyright-langserver" "--stdio"))))
+
+  (add-hook 'python-mode-hook #'my/basedpyright-eglot-setup)
+  (add-hook 'python-ts-mode-hook #'my/basedpyright-eglot-setup)
+#+end_src
+** zuban
+   Inactive alternative to BasedPyright. To switch back, mark the BasedPyright
+   block =:tangle no=, remove =:tangle no= here, and restart Emacs. Zuban uses
+   each project's uv environment for dependency resolution, falling back to an
+   isolated =uvx= server when the project has no Zuban executable.
+#+begin_src emacs-lisp :tangle no
+  (defun my/zuban-eglot-contact (&optional _interactive _project)
+    "Return the project-aware Eglot server command for Zuban."
+    (let* ((root (when-let* ((proj (project-current)))
+                   (project-root proj)))
+           (venv-root (and root
+                           (locate-dominating-file root ".venv/bin/zuban")))
+           (zuban (and venv-root
+                       (expand-file-name ".venv/bin/zuban" venv-root))))
+      (if (and zuban (file-executable-p zuban))
+          '("uv" "run" "zuban" "server")
+        (message
+         "[zuban] no project Zuban above %s; using isolated uvx fallback"
+         (or root "this project"))
+        '("uvx" "zuban" "server"))))
+
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '((python-mode python-ts-mode) . my/zuban-eglot-contact)))
+
+  (add-hook 'python-mode-hook #'my/eglot-ensure-maybe)
+  (add-hook 'python-ts-mode-hook #'my/eglot-ensure-maybe)
 #+end_src
 ** jinja shadow lsp
    Off by default. jinja-shadow-lsp proxies a Jinja template to its host
