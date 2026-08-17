@@ -36,25 +36,16 @@ The context window is your only control surface over the model. Treat it as a de
 
 ### Tests and evals — every time, no exceptions
 
-- Every feature ships with a test suite AND an eval suite, in the same commit. Not the next PR.
-- Every bug fix ships with a test AND an eval that would have caught the bug. The regression test is the proof the bug is fixed. The eval is the proof the fix generalizes.
-- Every failure gets skillified (the 10 steps). Same day. Same session when possible.
-- "I'll add tests later" is banned. If the tests/evals aren't in the diff, the work isn't done.
-- Two test lanes, different budgets:
-  - **Gate tests** — deterministic, local, free, <2s. Run on every commit via pre-commit hook. Never flaky.
-  - **Periodic evals** — paid (LLM calls), slower, quality-measuring. Run before ship and nightly. Allowed to be non-deterministic but must have a pass threshold.
+- Every feature ships with a test suite, in the same commit. Not the next PR.
+- Every bug fix ships with a test. The regression test is the proof the bug is fixed.
+- "I'll add tests later" is banned. If the tests aren't in the diff, the work isn't done.
+- **Gate tests** — deterministic, local, free, <2s. Run on every commit via pre-commit hook. Never flaky.
 
 ### Tie every change to a measurable outcome
 
 - Every feature names the outcome it moves before you build it: the metric, the workflow step, or the user-visible behavior that changes. "It works" is not an outcome.
 - If you can't state what gets measurably better and how you'll see it, that's a Confusion Protocol stop, not a license to build.
 - Wire in the trace. The change leaves evidence you can point at later: a metric, a log line, an eval score. Compute that produces no measurable, traceable result is theater.
-
-### LLM access — local Claude Code, not the API
-
-- When the software we build needs to call an LLM, do NOT use an LLM API (Anthropic API, OpenAI API, any hosted inference endpoint) unless Rodda explicitly instructs it. Route the call through the local Claude Code instead.
-- If no LLM service exists yet in the project, build one. Create a self-contained LLM service (under `services/llm/` per the architecture rules) that shells out to local Claude Code, with its own contract, tests, and evals. Every other service calls that contract, never an external API.
-- Always use the best available model by default unless Rodda explicitly instructs otherwise. No silent downgrades to a cheaper or smaller model for cost.
 
 ### Tech choice — vanilla by default
 
@@ -82,15 +73,6 @@ When a task matches a specialized domain (SEO, schema, security audit, design re
 Failures get skillified — that rule already stands. So does repeated success. The second time you run the same manual flow by hand, stop and codify it: a script, a skill, or a workflow. One-off prompts don't compound; reusable flows do. The leverage is in the work you stop having to think about, not in re-prompting from scratch each time. Done it twice by hand? The third time is a command.
 
 ## Architecture — services-first, parallel-friendly
-
-Build everything as independent services / self-contained directories. The goal: any single piece of the application can be worked on by a separate Claude Code session without stepping on another session's work.
-
-- **One concern, one directory.** Each service lives under `services/<service-name>/` (or equivalent top-level directory) with its own code, tests, evals, README, and config. No shared mutable state across services beyond well-defined contracts.
-- **Contracts at the boundary.** Services communicate via typed interfaces (HTTP, gRPC, message bus, or a shared schema package). Define the contract in a `contracts/` or `schemas/` directory that both sides import — never reach into another service's internals.
-- **Independent test + eval suites.** Each service has its own gate tests and periodic evals. A change in one service must not require running another service's full suite to validate.
-- **Independent deploy unit.** Each service builds and ships on its own. No monolithic release that forces every service to move in lockstep.
-- **Parallel-session safe.** Two Claude sessions working in `services/foo/` and `services/bar/` should never collide. If a change requires coordinated edits across services, that's a contract change — bump the schema version, update both sides, and call it out explicitly.
-- **Top-level only holds glue.** Root directory: orchestration scripts, shared config, contracts, docs. No business logic.
 
 When in doubt, lean toward more services with sharper boundaries rather than fewer services with fuzzy ones.
 
@@ -134,7 +116,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 
 At the end of every task, report one of:
 
-- **DONE** — All steps completed. Evidence provided for every claim. Tests + evals in the diff. Skillify checklist green if a failure was promoted. Ready to merge.
+- **DONE** — All steps completed. Evidence provided for every claim. Tests in the diff. Skillify checklist green if a failure was promoted. Ready to merge.
 - **DONE_WITH_CONCERNS** — Completed, but with issues Rodda should know about. List each concern with severity and a proposed follow-up.
 - **BLOCKED** — Cannot proceed. State what's blocking and what was already tried.
 - **NEEDS_CONTEXT** — Missing information required to continue. State exactly what's needed.
@@ -201,4 +183,4 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - If something is broken, say so plainly.
 - End responses with the next action, not a recap of what was just done.
 
-When Rodda asks for something, the answer is the finished product — not a plan. Tests included. Evals included. Docs included.
+When Rodda asks for something, the answer is the finished product — not a plan. Tests included.
