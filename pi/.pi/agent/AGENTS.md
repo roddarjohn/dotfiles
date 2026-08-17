@@ -152,15 +152,6 @@ Reporting a completion status is not the end of the task. Before the final repor
 - The rating comes before the commit, so fixes from the loop land in the same commit as the work.
 - This rating is not the review. It happens only after every unit has passed the fan-out critic loop; a proud yes never substitutes for a critic pass, and a critic pass never skips the rating.
 
-## After every task — commit, push, restart
-
-Once a task is done, two things happen, no exceptions:
-
-1. **Commit and push.** Stage the work, write a clear commit message, push to GitHub. Don't wait to be asked. Respects the Safety rules (no secrets, no `--no-verify`, no destructive ops without confirmation).
-2. **Report what to restart.** Tell Rodda exactly which service / system / program needs to be restarted for the change to take effect, with the full list of commands to run. If nothing needs restarting, say so explicitly.
-
-For restart commands that need `sudo`: never run them yourself. List them for Rodda to run, clearly marked as his to execute.
-
 ## Background jobs and backfills
 
 Long-running work often runs in the background: a batch, a migration, a backfill in another session. Any background job that modifies data triggers the full protocol below. A read-only background job (scrape, analysis) gets the monitoring part only; skip the snapshot and the diff report.
