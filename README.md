@@ -161,10 +161,12 @@ Emacs configuration.
 `bootstrap.sh` installs `rassumfrassum==0.3.4` and
 `basedpyright==1.39.10` from public PyPI, installing uv `0.11.26` into
 `~/.local/bin` when uv is absent or a different version is found. It also caches the `zuban==0.9.1` fallback. A project can own a
-different Zuban version by installing an executable at `.venv/bin/zuban`;
-Eglot searches upward from the current buffer directory and runs the nearest
-such executable directly, including nested monorepo environments. Without one,
-it runs the pinned fallback with `uvx --no-config` against public PyPI.
+different server version by installing `basedpyright-langserver` or `zuban` in
+its `.venv/bin`. Eglot searches upward from the current buffer for the nearest
+`.venv/bin/python`, activates that environment for the whole composite process,
+and prefers either server executable found there. Missing executables use the
+bootstrapped BasedPyright or pinned `uvx --no-config` Zuban fallback while still
+resolving editable and related imports from the activated workspace venv.
 Bootstrap and Eglot remove inherited uv/pip index, no-index, strategy, and
 find-links variables before every pinned operation, force uv's `first-index`
 strategy with public PyPI, and give Rass only the tracked routing directory on
@@ -189,9 +191,12 @@ scripts/test-python-lsp-live.sh
 ```
 
 It requires Emacs 30 or newer plus the bootstrapped tools, prints the tested
-Emacs version, and verifies Path completion resolve plus its `pathlib`
-auto-import edit, Zuban-only Flymake diagnostics, clean Rass shutdown, and
-absence of orphan child servers. This manual smoke is the Emacs-30 acceptance;
+Emacs version, builds a project venv containing `.pth`-linked editable
+dependencies but no language servers, poisons the inherited virtualenv and
+`PATH`, and verifies both servers resolve the workspace venv, Path completion
+resolve plus its `pathlib` auto-import edit, Zuban-only Flymake diagnostics,
+clean Rass shutdown, and absence of orphan child servers. This manual smoke is the
+Emacs-30 acceptance;
 CI may use its distro Emacs only for fast ERT compatibility. Shutdown warnings,
 forced termination, and non-zero process status fail the smoke. It is
 intentionally outside the sub-two-second pre-commit gate.

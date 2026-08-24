@@ -1530,14 +1530,16 @@ contacts carry their own guards, so they are allowed."
    Rass's streaming pull diagnostics to the standard push notifications that
    Emacs 30 understands.
 
-   A project's nearest executable ancestor =.venv/bin/zuban= is run directly.
-   Projects without one use the bootstrapped, cached =zuban==0.9.1= via =uvx=
-   and public PyPI. Inherited Python paths plus uv/pip index, no-index,
-   strategy, and find-links variables are removed; uv uses explicit public
-   PyPI with the =first-index= strategy.
-   Dynamic file watching stays disabled because Eglot can otherwise exhaust
-   descriptors in generated repositories. =bootstrap.sh= installs the pinned
-   global router and BasedPyright tools.
+   The nearest ancestor =.venv= with an executable Python is activated for the
+   whole composite process. BasedPyright and Zuban are loaded from that venv
+   when installed there; otherwise the bootstrapped BasedPyright and cached
+   =zuban==0.9.1= fallback run against the same activated environment. This
+   keeps editable and related workspace imports visible to both servers.
+   Inherited Python paths plus uv/pip index, no-index, strategy, and find-links
+   variables are removed; uv uses explicit public PyPI with the =first-index=
+   strategy. Dynamic file watching stays disabled because Eglot can otherwise
+   exhaust descriptors in generated repositories. =bootstrap.sh= installs the
+   pinned global router and fallback tools.
 #+name: python-lsp-composite
 #+begin_src emacs-lisp
   (defconst my/python-lsp-routing-directory
@@ -1547,45 +1549,50 @@ contacts carry their own guards, so they are allowed."
   (defconst my/zuban-fallback-version "0.9.1"
     "Zuban version used when a project has no executable local server.")
 
-  (defun my/basedpyright-python-executable (&optional dir)
-    "Return the Python executable for DIR, preferring an ancestor .venv."
-    (let* ((root (or dir
-                     (when-let* ((proj (project-current)))
-                       (project-root proj))
-                     default-directory))
-           (venv-root (locate-dominating-file root ".venv/bin/python"))
-           (venv-python (and venv-root
-                             (expand-file-name ".venv/bin/python" venv-root))))
-      (or (and venv-python
-               (file-executable-p venv-python)
-               venv-python)
-          (executable-find "python3")
-          (executable-find "python"))))
-
-  (defun my/basedpyright-workspace-configuration (_server)
-    "Return project-rooted Eglot settings for BasedPyright."
-    (when-let ((python (my/basedpyright-python-executable default-directory)))
-      `(:python (:pythonPath ,python)
-        :basedpyright (:analysis (:autoImportCompletions t)))))
-
-  (setq-default eglot-workspace-configuration
-                #'my/basedpyright-workspace-configuration)
+  (defun my/python-path-without-virtualenv-bin (directories virtualenv)
+    "Remove VIRTUALENV's bin directory from DIRECTORIES."
+    (if (not virtualenv)
+        directories
+      (let ((venv-bin
+             (directory-file-name
+              (expand-file-name "bin" virtualenv))))
+        (seq-remove
+         (lambda (directory)
+           (equal venv-bin
+                  (directory-file-name (expand-file-name directory))))
+         directories))))
 
   (defun my/python-eglot-contact (&optional _interactive _project)
-    "Return the buffer-local Rass contact for BasedPyright and Zuban."
+    "Run BasedPyright and Zuban against the nearest workspace virtualenv."
     (let* ((root default-directory)
+           (inherited-venv (getenv "VIRTUAL_ENV"))
+           (clean-path
+            (my/python-path-without-virtualenv-bin
+             (split-string (or (getenv "PATH") "") path-separator t)
+             inherited-venv))
+           (exec-path
+            (my/python-path-without-virtualenv-bin exec-path inherited-venv))
            (venv-root
             (locate-dominating-file
              root
              (lambda (dir)
                (file-executable-p
-                (expand-file-name ".venv/bin/zuban" dir)))))
-           (local-zuban (and venv-root
-                             (expand-file-name ".venv/bin/zuban" venv-root)))
+                (expand-file-name ".venv/bin/python" dir)))))
+           (venv (and venv-root
+                      (expand-file-name ".venv" venv-root)))
+           (venv-bin (and venv (expand-file-name "bin" venv)))
+           (local-basedpyright
+            (and venv-bin
+                 (expand-file-name "basedpyright-langserver" venv-bin)))
+           (local-zuban (and venv-bin (expand-file-name "zuban" venv-bin)))
            (router (expand-file-name "rass_zuban.py"
                                      my/python-lsp-routing-directory))
            (rass (executable-find "rass"))
-           (basedpyright (executable-find "basedpyright-langserver"))
+           (basedpyright
+            (or (and local-basedpyright
+                     (file-executable-p local-basedpyright)
+                     local-basedpyright)
+                (executable-find "basedpyright-langserver")))
            (env (executable-find "env"))
            (uvx (executable-find "uvx"))
            (zuban-command
@@ -1593,8 +1600,8 @@ contacts carry their own guards, so they are allowed."
                 (list local-zuban "server")
               (unless uvx
                 (user-error
-                 "uvx is required when no project .venv/bin/zuban exists; rerun bootstrap.sh"))
-              (message "[python-lsp] no project Zuban above %s; using uvx %s"
+                 "uvx is required when the workspace venv has no zuban; rerun bootstrap.sh"))
+              (message "[python-lsp] no workspace Zuban above %s; using uvx %s"
                        root my/zuban-fallback-version)
               (list uvx
                     "--no-config"
@@ -1626,6 +1633,15 @@ contacts carry their own guards, so they are allowed."
               "-u" "PIP_FIND_LINKS"
               "-u" "PIP_NO_INDEX"
               "-u" "PYTHONHOME"
+              "-u" "VIRTUAL_ENV")
+        (when venv
+          (list (concat "VIRTUAL_ENV=" venv)))
+        (list (concat "PATH="
+                      (mapconcat #'identity
+                                 (if venv
+                                     (cons venv-bin clean-path)
+                                   clean-path)
+                                 path-separator))
               (concat "PYTHONPATH=" my/python-lsp-routing-directory)
               rass
               "--stream-diagnostics"
