@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -e
 
-DOTFILES_DIR="$(cd "$(dirname "$0")" && pwd)"
+DOTFILES_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd -P)"
 OS="$(uname -s)"
 
 # ── STOW ───────────────────────────────────────────────────────────────────────
@@ -10,46 +10,103 @@ if ! command -v stow >/dev/null 2>&1; then
     exit 1
 fi
 
-echo "→ Linking dotfiles with stow..."
-
-# Remove any existing symlinks pointing into the old config/ layout
-find "$HOME" -maxdepth 4 -type l 2>/dev/null | while read -r link; do
-    case "$(readlink "$link")" in
-        "$DOTFILES_DIR"/config/*) rm "$link" ;;
+# Never write through a symlinked path component. Historical folds and nested
+# runtime links may point outside HOME, and copying through them cannot preserve
+# concurrent application state safely. Run this complete preflight before
+# legacy cleanup, mkdir, backups, Stow, plugin installation, fonts, or Cosmic.
+reject_symlinked_components() (
+    checked_path=$1
+    case "$checked_path" in
+        /*) ;;
+        *)
+            echo "✗ Refusing non-absolute managed path: $checked_path" >&2
+            exit 1
+            ;;
     esac
+    component=
+    remainder=${checked_path#/}
+    while [ -n "$remainder" ]; do
+        case "$remainder" in
+            */*) part=${remainder%%/*}; remainder=${remainder#*/} ;;
+            *) part=$remainder; remainder= ;;
+        esac
+        [ -n "$part" ] || continue
+        component="$component/$part"
+        [ -L "$component" ] || continue
+        target=$(readlink "$component")
+        echo "✗ Refusing symlinked managed path component: $component -> $target" >&2
+        echo "  Stop applications that own this data, then manually unfold/migrate it into a real directory before rerunning install.sh." >&2
+        exit 1
+    done
+)
+
+COSMIC_TERM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/cosmic/com.system76.CosmicTerm/v1"
+for write_directory in \
+    "$HOME/.config/cosmic/com.system76.CosmicTerm/v1" \
+    "$COSMIC_TERM_CONFIG" \
+    "$HOME/.local/bin" \
+    "$HOME/.local/share" \
+    "$HOME/.local/state" \
+    "$HOME/.local/share/fonts" \
+    "$HOME/.pi/agent" \
+    "$HOME/.claude" \
+    "$HOME/.emacs.d" \
+    "$HOME/.tmux/plugins/tpm" \
+    "$HOME/Library/Fonts"
+do
+    reject_symlinked_components "$write_directory"
 done
 
-# Wipe and recreate target directories before stowing.
-# If a target directory doesn't exist, stow replaces it with a single symlink
-# (e.g. ~/.emacs.d -> dotfiles/emacs/.emacs.d), causing Emacs runtime data
-# (elpa/, straight/, history, etc.) to land inside the dotfiles repo.
-# A pre-existing real directory forces stow to symlink individual files instead.
-rm -rf "$HOME/.emacs.d"
+echo "→ Linking dotfiles with stow..."
+
+# Remove legacy symlinks pointing into the old config/ layout.  Keep traversal
+# portable to BSD find by scanning only the configuration roots we manage.
+for root in "$HOME/.config" "$HOME/.local" "$HOME/.emacs.d" \
+            "$HOME/.pi" "$HOME/.claude"; do
+    [ -e "$root" ] || [ -L "$root" ] || continue
+    find "$root" -type l 2>/dev/null | while IFS= read -r link; do
+        case "$(readlink "$link")" in
+            "$DOTFILES_DIR"/config/*) rm "$link" ;;
+        esac
+    done
+done
+
+# Keep runtime targets real so future writes never land in package sources.
 mkdir -p "$HOME/.emacs.d"
 
-# Same reasoning for pi: pre-create the real ~/.pi/agent directory so stow folds
-# the resource subdirs (skills/, extensions/, prompts/, themes/) and settings.json
-# into individual symlinks, instead of replacing ~/.pi with one big symlink. That
+next_backup_path() {
+    source=$1
+    candidate="$source.pre-stow.bak"
+    suffix=0
+    while [ -e "$candidate" ] || [ -L "$candidate" ]; do
+        suffix=$((suffix + 1))
+        candidate="$source.pre-stow.bak.$suffix"
+    done
+    printf '%s\n' "$candidate"
+}
+
+# Same reasoning for pi: pre-create the real ~/.pi/agent directory so non-folding
+# stow links resource files and settings.json individually instead of replacing
+# ~/.pi with one big symlink. That
 # keeps pi's runtime data (trust.json, auth.json, npm/, sessions) as real files
 # inside ~/.pi/agent rather than leaking into the dotfiles repo.
 mkdir -p "$HOME/.pi/agent"
 # If pi previously wrote its own settings.json, move it aside so stow can place
 # the tracked symlink without a conflict. Your old settings are kept as a .bak.
 if [ -f "$HOME/.pi/agent/settings.json" ] && [ ! -L "$HOME/.pi/agent/settings.json" ]; then
-    mv "$HOME/.pi/agent/settings.json" "$HOME/.pi/agent/settings.json.pre-stow.bak"
-    echo "  • existing pi settings.json backed up to settings.json.pre-stow.bak"
+    pi_backup=$(next_backup_path "$HOME/.pi/agent/settings.json")
+    mv "$HOME/.pi/agent/settings.json" "$pi_backup"
+    echo "  • existing pi settings.json backed up to $(basename "$pi_backup")"
 fi
 
-# macOS ships neither ~/.config nor ~/.local, so at stow time they're absent and
-# stow folds each whole subtree into a single symlink (~/.config -> tmux/.config,
-# ~/.local -> bin/.local). Every runtime write then lands inside this repo: the
-# yarn link registry, uv/mise data, gh state, even copilot auth. Pre-create them
-# real so stow links individual files instead -- a no-op on Linux, where the OS
-# already provides these dirs (which is why it only misbehaves on macOS).
+# macOS ships neither ~/.config nor ~/.local. Pre-create both as real roots and
+# use non-folding stow; whole-root symlinks can put yarn, uv/mise, gh, and
+# copilot runtime data in this repo. This is a no-op on Linux when the roots
+# already exist.
 mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share" "$HOME/.local/state"
 
 # Same reasoning again for Claude Code: pre-create the real ~/.claude directory so
-# stow links only the tracked entries (CLAUDE.md, skills/, settings.json) into it,
+# non-folding stow links tracked entries (CLAUDE.md, skills/, settings.json) into it,
 # leaving Claude's own runtime data (sessions, cache, history) as real files. Most of
 # the claude/ package is generated from pi/ by scripts/sync-claude-from-pi.sh;
 # settings.json is the one hand/Claude-maintained file, edited in place via the symlink.
@@ -57,17 +114,26 @@ mkdir -p "$HOME/.claude"
 # If Claude previously wrote its own settings.json, move it aside so stow can place
 # the tracked symlink without a conflict. Your old settings are kept as a .bak.
 if [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" ]; then
-    mv "$HOME/.claude/settings.json" "$HOME/.claude/settings.json.pre-stow.bak"
-    echo "  • existing claude settings.json backed up to settings.json.pre-stow.bak"
+    claude_backup=$(next_backup_path "$HOME/.claude/settings.json")
+    mv "$HOME/.claude/settings.json" "$claude_backup"
+    echo "  • existing claude settings.json backed up to $(basename "$claude_backup")"
 fi
 
-for pkg in zsh tmux emacs bin pi claude; do
-    stow "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
+STOW_PACKAGES=${DOTFILES_INSTALL_STOW_PACKAGES:-"zsh tmux emacs bin pi claude"}
+# shellcheck disable=SC2086 # Deliberate package-name word splitting.
+for pkg in $STOW_PACKAGES; do
+    stow --no-folding "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"
     echo "  ✓ $pkg"
 done
 
 # Route git hooks at the tracked .githooks/ dir so the pi -> claude sync runs on commit.
 git -C "$DOTFILES_DIR" config core.hooksPath .githooks
+
+# Used only by the fast regression test for stow idempotence.  Normal installs
+# continue through every remaining setup phase.
+if [ "${DOTFILES_INSTALL_STOW_ONLY:-0}" = "1" ]; then
+    exit 0
+fi
 
 # ── TPM ────────────────────────────────────────────────────────────────────────
 if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
@@ -128,7 +194,6 @@ esac
 # ── COSMIC TERMINAL (Linux only) ───────────────────────────────────────────────
 if [ "$OS" = "Linux" ]; then
     echo "→ Configuring Cosmic Terminal font..."
-    COSMIC_TERM_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/cosmic/com.system76.CosmicTerm/v1"
     mkdir -p "$COSMIC_TERM_CONFIG"
     echo 'font_name = "MesloLGM Nerd Font"' > "$COSMIC_TERM_CONFIG/font_name"
     echo 'font_size = 12'                   > "$COSMIC_TERM_CONFIG/font_size"

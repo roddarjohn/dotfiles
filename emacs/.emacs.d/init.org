@@ -1521,15 +1521,32 @@ contacts carry their own guards, so they are allowed."
   (add-hook 'css-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'just-ts-mode-hook 'my/eglot-ensure-maybe)
 #+end_src
-** basedpyright
-   The active Python language server. BasedPyright supplies completion-menu
-   auto-imports and their source modules. The Python interpreter comes from the
-   nearest ancestor =.venv= so nested uv workspace packages resolve the shared
-   environment correctly. Dynamic file watching is disabled for this server
-   because Eglot allocates one descriptor per project directory and can exceed
-   macOS's launchd descriptor limit in generated repositories. Install the
-   server with =uv tool install basedpyright=.
+** Python: BasedPyright completion + Zuban diagnostics
+   Python uses one Eglot connection backed by exactly two ordered servers.
+   [[https://github.com/DetachHead/basedpyright][BasedPyright]] is first and owns
+   completion, resolve, and auto-import edits. [[https://docs.zubanls.com/][Zuban]]
+   is second and is the only diagnostic source. =rassumfrassum= multiplexes
+   them; the tracked =lsp/rass_zuban.py= policy enforces ownership and converts
+   Rass's streaming pull diagnostics to the standard push notifications that
+   Emacs 30 understands.
+
+   A project's nearest executable ancestor =.venv/bin/zuban= is run directly.
+   Projects without one use the bootstrapped, cached =zuban==0.9.1= via =uvx=
+   and public PyPI. Inherited Python paths plus uv/pip index, no-index,
+   strategy, and find-links variables are removed; uv uses explicit public
+   PyPI with the =first-index= strategy.
+   Dynamic file watching stays disabled because Eglot can otherwise exhaust
+   descriptors in generated repositories. =bootstrap.sh= installs the pinned
+   global router and BasedPyright tools.
+#+name: python-lsp-composite
 #+begin_src emacs-lisp
+  (defconst my/python-lsp-routing-directory
+    (expand-file-name "lsp/" user-emacs-directory)
+    "Directory containing the tracked Rass Python routing module.")
+
+  (defconst my/zuban-fallback-version "0.9.1"
+    "Zuban version used when a project has no executable local server.")
+
   (defun my/basedpyright-python-executable (&optional dir)
     "Return the Python executable for DIR, preferring an ancestor .venv."
     (let* ((root (or dir
@@ -1554,49 +1571,85 @@ contacts carry their own guards, so they are allowed."
   (setq-default eglot-workspace-configuration
                 #'my/basedpyright-workspace-configuration)
 
+  (defun my/python-eglot-contact (&optional _interactive _project)
+    "Return the buffer-local Rass contact for BasedPyright and Zuban."
+    (let* ((root default-directory)
+           (venv-root
+            (locate-dominating-file
+             root
+             (lambda (dir)
+               (file-executable-p
+                (expand-file-name ".venv/bin/zuban" dir)))))
+           (local-zuban (and venv-root
+                             (expand-file-name ".venv/bin/zuban" venv-root)))
+           (router (expand-file-name "rass_zuban.py"
+                                     my/python-lsp-routing-directory))
+           (rass (executable-find "rass"))
+           (basedpyright (executable-find "basedpyright-langserver"))
+           (env (executable-find "env"))
+           (uvx (executable-find "uvx"))
+           (zuban-command
+            (if (and local-zuban (file-executable-p local-zuban))
+                (list local-zuban "server")
+              (unless uvx
+                (user-error
+                 "uvx is required when no project .venv/bin/zuban exists; rerun bootstrap.sh"))
+              (message "[python-lsp] no project Zuban above %s; using uvx %s"
+                       root my/zuban-fallback-version)
+              (list uvx
+                    "--no-config"
+                    "--index-strategy" "first-index"
+                    "--default-index" "https://pypi.org/simple"
+                    "--from" (concat "zuban==" my/zuban-fallback-version)
+                    "zuban" "server"))))
+      (unless (file-readable-p router)
+        (user-error "Python LSP router is missing: %s; restore dotfiles or rerun stow" router))
+      (unless env
+        (user-error "env executable is required for Python LSP startup"))
+      (unless rass
+        (user-error "rass is missing; rerun bootstrap.sh"))
+      (unless basedpyright
+        (user-error "basedpyright-langserver is missing; rerun bootstrap.sh"))
+      (cons
+       'my/python-eglot-server
+       (append
+        (list env
+              "-u" "UV_INDEX"
+              "-u" "UV_DEFAULT_INDEX"
+              "-u" "UV_EXTRA_INDEX_URL"
+              "-u" "UV_INDEX_URL"
+              "-u" "UV_FIND_LINKS"
+              "-u" "UV_NO_INDEX"
+              "-u" "UV_INDEX_STRATEGY"
+              "-u" "PIP_INDEX_URL"
+              "-u" "PIP_EXTRA_INDEX_URL"
+              "-u" "PIP_FIND_LINKS"
+              "-u" "PIP_NO_INDEX"
+              "-u" "PYTHONHOME"
+              (concat "PYTHONPATH=" my/python-lsp-routing-directory)
+              rass
+              "--stream-diagnostics"
+              "--log-level" "warn"
+              "--logic-class" "rass_zuban.PythonRoutingLogic"
+              "--"
+              basedpyright "--stdio"
+              "--")
+        zuban-command))))
+
   (with-eval-after-load 'eglot
-    (defclass my/basedpyright-eglot-server (eglot-lsp-server) ())
+    (defclass my/python-eglot-server (eglot-lsp-server) ())
 
     (cl-defmethod eglot-client-capabilities
-      ((server my/basedpyright-eglot-server))
+      ((server my/python-eglot-server))
       (let ((capabilities (cl-call-next-method)))
         (setf (plist-get (plist-get capabilities :workspace)
                          :didChangeWatchedFiles)
               '(:dynamicRegistration :json-false))
         capabilities))
 
-    (add-to-list 'eglot-server-programs
-                 '((python-mode python-ts-mode)
-                   my/basedpyright-eglot-server
-                   "basedpyright-langserver" "--stdio")))
-
-  (add-hook 'python-mode-hook #'my/eglot-ensure-maybe)
-  (add-hook 'python-ts-mode-hook #'my/eglot-ensure-maybe)
-#+end_src
-** zuban
-   Inactive alternative to BasedPyright. To switch back, mark the BasedPyright
-   block =:tangle no=, remove =:tangle no= here, and restart Emacs. Zuban uses
-   each project's uv environment for dependency resolution, falling back to an
-   isolated =uvx= server when the project has no Zuban executable.
-#+begin_src emacs-lisp :tangle no
-  (defun my/zuban-eglot-contact (&optional _interactive _project)
-    "Return the project-aware Eglot server command for Zuban."
-    (let* ((root (when-let* ((proj (project-current)))
-                   (project-root proj)))
-           (venv-root (and root
-                           (locate-dominating-file root ".venv/bin/zuban")))
-           (zuban (and venv-root
-                       (expand-file-name ".venv/bin/zuban" venv-root))))
-      (if (and zuban (file-executable-p zuban))
-          '("uv" "run" "zuban" "server")
-        (message
-         "[zuban] no project Zuban above %s; using isolated uvx fallback"
-         (or root "this project"))
-        '("uvx" "zuban" "server"))))
-
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs
-                 '((python-mode python-ts-mode) . my/zuban-eglot-contact)))
+    (add-to-list
+     'eglot-server-programs
+     '((python-mode python-ts-mode) . my/python-eglot-contact)))
 
   (add-hook 'python-mode-hook #'my/eglot-ensure-maybe)
   (add-hook 'python-ts-mode-hook #'my/eglot-ensure-maybe)

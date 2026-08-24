@@ -12,6 +12,7 @@
 #                             macOS --with-ns into /Applications/Emacs.app)
 #   5. ./install.sh          (stow, tpm + auto plugin install, fonts,
 #                             Cosmic terminal on Linux)
+#   5b. Python LSP tools     (uv, rassumfrassum, BasedPyright, Zuban cache)
 #   6. jsonnet-language-server            (optional, prompted)
 #   7. regal (Rego language server)       (optional, prompted)
 #   8. tofu-ls (OpenTofu/Terraform LSP)   (optional, prompted)
@@ -32,6 +33,26 @@ DOTFILES_DIR="$(cd "$(dirname "$0")" && pwd)"
 # ── Pinned versions ──────────────────────────────────────────────────
 TREE_SITTER_VERSION="v0.25.0"   # tag in tree-sitter/tree-sitter
 EMACS_BRANCH="emacs-30"         # branch of emacs-mirror/emacs (both OSes)
+UV_VERSION="0.11.26"
+RASSUMFRASSUM_VERSION="0.3.4"
+BASEDPYRIGHT_VERSION="1.39.10"
+NODEJS_WHEEL_VERSION="24.16.0"
+ZUBAN_FALLBACK_VERSION="0.9.1"
+PYPI_INDEX="https://pypi.org/simple"
+UV_PUBLIC_ENV=(
+    env
+    -u UV_INDEX
+    -u UV_DEFAULT_INDEX
+    -u UV_EXTRA_INDEX_URL
+    -u UV_INDEX_URL
+    -u UV_FIND_LINKS
+    -u UV_NO_INDEX
+    -u UV_INDEX_STRATEGY
+    -u PIP_INDEX_URL
+    -u PIP_EXTRA_INDEX_URL
+    -u PIP_FIND_LINKS
+    -u PIP_NO_INDEX
+)
 
 # ── Pretty output ─────────────────────────────────────────────────────
 bold()    { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -290,6 +311,90 @@ section "5. Dotfiles install.sh"
 step "Running $DOTFILES_DIR/install.sh"
 "$DOTFILES_DIR/install.sh"
 ok "install.sh complete"
+
+# ── 5b. Python LSP tools ──────────────────────────────────────────────
+# Rass multiplexes BasedPyright completion with Zuban diagnostics.  Every uv
+# invocation ignores user configuration so a private/default index cannot
+# override the pinned public-PyPI bootstrap.
+section "5b. Python LSP tools"
+installed_uv_version=""
+uv_probe=$(command -v uv 2>/dev/null || true)
+if [ -x "$HOME/.local/bin/uv" ]; then
+    uv_probe="$HOME/.local/bin/uv"
+fi
+if [ -n "$uv_probe" ]; then
+    installed_uv_version=$("$uv_probe" --version 2>/dev/null | awk '{print $2}' || true)
+fi
+if [ "$installed_uv_version" = "$UV_VERSION" ]; then
+    skip "uv $UV_VERSION already present: $uv_probe"
+else
+    if [ -n "$installed_uv_version" ]; then
+        step "Installing pinned uv $UV_VERSION (PATH version is $installed_uv_version)"
+    else
+        step "Installing pinned uv $UV_VERSION (uv is absent)"
+    fi
+    mkdir -p "$HOME/.local/bin"
+    curl -LsSf "https://astral.sh/uv/$UV_VERSION/install.sh" |
+        env UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 sh
+    ok "uv $UV_VERSION installed to ~/.local/bin without shell PATH edits"
+fi
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv >/dev/null 2>&1 || fail "uv install completed but uv is not on PATH"
+final_uv_version=$(uv --version 2>/dev/null | awk '{print $2}' || true)
+[ "$final_uv_version" = "$UV_VERSION" ] ||
+    fail "Expected uv $UV_VERSION after install, got ${final_uv_version:-unknown} from $(command -v uv)"
+
+if command -v rass >/dev/null 2>&1 && \
+   rass --version 2>/dev/null | grep -qE "(^|[[:space:]])${RASSUMFRASSUM_VERSION}([[:space:]]|$)"; then
+    skip "rassumfrassum $RASSUMFRASSUM_VERSION already installed"
+else
+    step "Installing rassumfrassum $RASSUMFRASSUM_VERSION from public PyPI"
+    "${UV_PUBLIC_ENV[@]}" uv tool install \
+        --no-config \
+        --index-strategy first-index \
+        --default-index "$PYPI_INDEX" \
+        --force \
+        "rassumfrassum==$RASSUMFRASSUM_VERSION"
+    ok "rassumfrassum $RASSUMFRASSUM_VERSION installed"
+fi
+
+basedpyright_runtime_ready() {
+    local cli server cli_dir server_dir version
+    cli=$(command -v basedpyright 2>/dev/null || true)
+    server=$(command -v basedpyright-langserver 2>/dev/null || true)
+    [ -n "$cli" ] && [ -x "$cli" ] || return 1
+    [ -n "$server" ] && [ -x "$server" ] || return 1
+    version=$("$cli" --version 2>/dev/null | awk 'NR == 1 { print $NF }')
+    [ "$version" = "$BASEDPYRIGHT_VERSION" ] || return 1
+    cli_dir=$(CDPATH='' cd -- "$(dirname "$cli")" && pwd -P) || return 1
+    server_dir=$(CDPATH='' cd -- "$(dirname "$server")" && pwd -P) || return 1
+    [ "$cli_dir" = "$server_dir" ]
+}
+
+if basedpyright_runtime_ready; then
+    skip "basedpyright $BASEDPYRIGHT_VERSION CLI and language server already installed together"
+else
+    step "Installing basedpyright $BASEDPYRIGHT_VERSION from public PyPI"
+    "${UV_PUBLIC_ENV[@]}" uv tool install \
+        --no-config \
+        --index-strategy first-index \
+        --default-index "$PYPI_INDEX" \
+        --force \
+        --with "nodejs-wheel-binaries==$NODEJS_WHEEL_VERSION" \
+        "basedpyright==$BASEDPYRIGHT_VERSION"
+    ok "basedpyright $BASEDPYRIGHT_VERSION installed"
+fi
+basedpyright_runtime_ready ||
+    fail "Expected executable basedpyright $BASEDPYRIGHT_VERSION and basedpyright-langserver in the same bin directory"
+
+step "Prewarming the zuban $ZUBAN_FALLBACK_VERSION uvx fallback"
+"${UV_PUBLIC_ENV[@]}" uvx \
+    --no-config \
+    --index-strategy first-index \
+    --default-index "$PYPI_INDEX" \
+    --from "zuban==$ZUBAN_FALLBACK_VERSION" \
+    zuban --version
+ok "zuban $ZUBAN_FALLBACK_VERSION fallback cached"
 
 # ── 6. jsonnet-language-server (optional) ─────────────────────────────
 section "6. jsonnet-language-server (optional)"

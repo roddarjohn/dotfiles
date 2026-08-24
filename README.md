@@ -12,7 +12,9 @@ cd ~/dotfiles
 
 `bootstrap.sh` automates everything under Prerequisites and Install below:
 apt packages, oh-my-zsh, building tree-sitter and Emacs 30 from source,
-running `install.sh`, and (optionally, with prompts) installing
+running `install.sh`, installing the pinned Python LSP stack (uv,
+rassumfrassum, BasedPyright, and a cached Zuban fallback), and (optionally,
+with prompts) installing
 `jsonnet-language-server`, `regal`, `tofu-ls`, `terragrunt-ls`,
 `copilot-language-server`, `mise`, `syncthing`, and the `pi` coding agent
 CLI. Each phase is idempotent, so
@@ -93,7 +95,12 @@ cd ~/dotfiles
 
 The install script will:
 
-1. Symlink all config files into `$HOME` via stow (`zsh`, `tmux`, `emacs`, `bin`, `pi`)
+1. Refuse any symlinked component of a managed write path before making
+   changes, including nested paths such as `~/.local/bin` and `~/.pi/agent` as
+   well as managed roots. Stop the applications that own those paths and
+   manually migrate historical folds or foreign links to real directories
+   first. With real paths, link tracked files via non-folding stow
+   (`zsh`, `tmux`, `emacs`, `bin`, `pi`, `claude`)
 2. Install [tpm](https://github.com/tmux-plugins/tpm) (tmux plugin manager)
 3. Install the Meslo Nerd Font
 4. Configure the COSMIC Terminal font
@@ -141,6 +148,53 @@ Additional guides live in `docs/`:
 - [Syncthing setup](docs/syncthing-setup.md) — peer-to-peer file sync across machines and Android
 
 ### LSP servers
+
+#### Python: BasedPyright + Zuban
+
+Python buffers use a single Eglot connection multiplexed by
+[rassumfrassum](https://pypi.org/project/rassumfrassum/). BasedPyright owns
+completion, resolve, and auto-import edits; Zuban is the only diagnostic
+provider. The routing policy is tracked at
+`emacs/.emacs.d/lsp/rass_zuban.py`, while `init.org` remains the authoritative
+Emacs configuration.
+
+`bootstrap.sh` installs `rassumfrassum==0.3.4` and
+`basedpyright==1.39.10` from public PyPI, installing uv `0.11.26` into
+`~/.local/bin` when uv is absent or a different version is found. It also caches the `zuban==0.9.1` fallback. A project can own a
+different Zuban version by installing an executable at `.venv/bin/zuban`;
+Eglot searches upward from the current buffer directory and runs the nearest
+such executable directly, including nested monorepo environments. Without one,
+it runs the pinned fallback with `uvx --no-config` against public PyPI.
+Bootstrap and Eglot remove inherited uv/pip index, no-index, strategy, and
+find-links variables before every pinned operation, force uv's `first-index`
+strategy with public PyPI, and give Rass only the tracked routing directory on
+`PYTHONPATH`.
+
+Run the local gate after changing the router, contact, bootstrap, or tests:
+
+```bash
+scripts/test-python-lsp.sh
+```
+
+The gate runs standard-library Python/ERT tests plus an Emacs tangle/read
+syntax check through the installed `rassumfrassum==0.3.4` uv-tool interpreter,
+without resolving packages during the gate, and enforces a two-second budget. The tracked
+pre-commit hook invokes it only when a relevant file is staged, then rejects
+unstaged or untracked drift across every gate input before testing.
+
+Run the slower real-server Emacs smoke manually after changing server behavior:
+
+```bash
+scripts/test-python-lsp-live.sh
+```
+
+It requires Emacs 30 or newer plus the bootstrapped tools, prints the tested
+Emacs version, and verifies Path completion resolve plus its `pathlib`
+auto-import edit, Zuban-only Flymake diagnostics, clean Rass shutdown, and
+absence of orphan child servers. This manual smoke is the Emacs-30 acceptance;
+CI may use its distro Emacs only for fast ERT compatibility. Shutdown warnings,
+forced termination, and non-zero process status fail the smoke. It is
+intentionally outside the sub-two-second pre-commit gate.
 
 #### jsonnet-language-server
 
