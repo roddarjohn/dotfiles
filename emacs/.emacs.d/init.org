@@ -997,10 +997,10 @@ I don't fully use this right now. Perhaps I should.
 #+end_src
 
 ** format on save
-   Project-aware: walks up from the buffer to find a formatter
-   config and invokes the matching tool over stdin. No-ops silently
-   when no config is found, so opening a JS/TS file in a project
-   that doesn't ship a formatter doesn't surprise you.
+   Project-aware: walks up from the buffer to find a formatter config
+   and invokes the matching tool over stdin. Prettier also works without
+   a config when the project has a local executable. No-ops silently when
+   the project doesn't ship a formatter.
 
 #+begin_src emacs-lisp
   (defvar js-ts-biome-configs '("biome.json" "biome.jsonc"))
@@ -1008,66 +1008,157 @@ I don't fully use this right now. Perhaps I should.
   (defvar js-ts-prettier-configs
     '(".prettierrc" ".prettierrc.json" ".prettierrc.yaml" ".prettierrc.yml"
       ".prettierrc.json5" ".prettierrc.js" ".prettierrc.cjs"
-      ".prettierrc.mjs" ".prettierrc.toml"
-      "prettier.config.js" "prettier.config.cjs" "prettier.config.mjs"))
+      ".prettierrc.mjs" ".prettierrc.ts" ".prettierrc.cts" ".prettierrc.mts"
+      ".prettierrc.toml" "prettier.config.js" "prettier.config.cjs"
+      "prettier.config.mjs" "prettier.config.ts" "prettier.config.cts"
+      "prettier.config.mts"))
 
   (defvar js-ts-dprint-configs '("dprint.json" ".dprint.json"))
 
   (defun js-ts--has-config-p (dir filenames)
     (seq-some (lambda (f) (file-exists-p (expand-file-name f dir))) filenames))
 
+  (defun js-ts--start-directory ()
+    (or (and buffer-file-name (file-name-directory buffer-file-name))
+        default-directory))
+
+  (defun js-ts--project-root ()
+    "Return the nearest Git or package boundary for formatter discovery."
+    (let* ((start (js-ts--start-directory))
+           (git-root (locate-dominating-file start ".git"))
+           (package-root (locate-dominating-file start "package.json")))
+      (cond
+       ((and git-root package-root)
+        (if (file-in-directory-p package-root git-root)
+            package-root
+          git-root))
+       (git-root)
+       (package-root)
+       (start))))
+
+  (defun js-ts--locate-in-project (predicate)
+    "Find the nearest ancestor matching PREDICATE inside the project."
+    (let* ((project-root (file-name-as-directory
+                          (expand-file-name (js-ts--project-root))))
+           (found (locate-dominating-file (js-ts--start-directory) predicate)))
+      (when (and found
+                 (or (equal (file-name-as-directory (expand-file-name found))
+                            project-root)
+                     (file-in-directory-p found project-root)))
+        found)))
+
   (defun js-ts--find-config-root (filenames)
-    (let ((start (or (and buffer-file-name (file-name-directory buffer-file-name))
-                     default-directory)))
-      (locate-dominating-file
-       start (lambda (d) (js-ts--has-config-p d filenames)))))
+    (js-ts--locate-in-project
+     (lambda (dir) (js-ts--has-config-p dir filenames))))
+
+  (defun js-ts--read-package-json (dir)
+    "Read DIR/package.json as an alist, or return `js-ts-invalid-json'."
+    (condition-case nil
+        (with-temp-buffer
+          (insert-file-contents (expand-file-name "package.json" dir))
+          (let ((package (json-parse-buffer :object-type 'alist)))
+            (if (listp package) package 'js-ts-invalid-json)))
+      (error 'js-ts-invalid-json)))
+
+  (defun js-ts--package-context-valid-p ()
+    "Return non-nil when the nearest package.json is a JSON object."
+    (if-let ((root
+              (js-ts--locate-in-project
+               (lambda (dir)
+                 (file-exists-p (expand-file-name "package.json" dir))))))
+        (not (eq (js-ts--read-package-json root) 'js-ts-invalid-json))
+      t))
+
+  (defun js-ts--package-json-has-prettier-p (dir)
+    "Return non-nil when DIR/package.json contains a Prettier config."
+    (let ((package-file (expand-file-name "package.json" dir)))
+      (and (file-readable-p package-file)
+           (let ((package (js-ts--read-package-json dir)))
+             (and (listp package) (assq 'prettier package))))))
+
+  (defun js-ts--find-prettier-config-root ()
+    (js-ts--locate-in-project
+     (lambda (dir)
+       (or (js-ts--has-config-p dir js-ts-prettier-configs)
+           (js-ts--package-json-has-prettier-p dir)))))
+
+  (defun js-ts--find-local-bin (tool)
+    "Return the nearest project-local TOOL executable, or nil."
+    (when-let ((root
+                (js-ts--locate-in-project
+                 (lambda (dir)
+                   (file-executable-p
+                    (expand-file-name (concat "node_modules/.bin/" tool)
+                                      dir))))))
+      (expand-file-name (concat "node_modules/.bin/" tool) root)))
 
   (defun js-ts--resolve-bin (root tool)
-    "Prefer ROOT/node_modules/.bin/TOOL when present, else TOOL on $PATH."
-    (let ((local (expand-file-name (concat "node_modules/.bin/" tool) root)))
-      (if (file-executable-p local) local tool)))
+    "Prefer the nearest project-local TOOL, then ROOT's, then $PATH."
+    (or (js-ts--find-local-bin tool)
+        (let ((local (expand-file-name (concat "node_modules/.bin/" tool)
+                                      root)))
+          (and (file-executable-p local) local))
+        (executable-find tool)))
 
   (defun js-ts--detect-formatter ()
     "Return (CMD ARGS...) for the project's formatter, or nil."
     (let ((file (or (buffer-file-name) "buffer.tsx")))
-      (cond
-       ((when-let ((root (js-ts--find-config-root js-ts-biome-configs)))
-          `(,(js-ts--resolve-bin root "biome")
-            "format" "--stdin-file-path" ,file)))
-       ((when-let ((root (js-ts--find-config-root js-ts-prettier-configs)))
-          `(,(js-ts--resolve-bin root "prettier")
-            "--stdin-filepath" ,file)))
-       ((when-let ((root (js-ts--find-config-root js-ts-dprint-configs)))
-          `(,(js-ts--resolve-bin root "dprint")
-            "fmt" "--stdin" ,file))))))
+      (when (js-ts--package-context-valid-p)
+        (cond
+         ((when-let* ((root (js-ts--find-config-root js-ts-biome-configs))
+                      (biome (js-ts--resolve-bin root "biome")))
+            `(,biome "format" "--stdin-file-path" ,file)))
+         ((when-let* ((root (js-ts--find-prettier-config-root))
+                      (prettier (js-ts--resolve-bin root "prettier")))
+            `(,prettier "--stdin-filepath" ,file)))
+         ((when-let* ((root (js-ts--find-config-root js-ts-dprint-configs))
+                      (dprint (js-ts--resolve-bin root "dprint")))
+            `(,dprint "fmt" "--stdin" ,file)))
+         ;; Prettier intentionally works without a config file. A local binary
+         ;; is enough evidence that the project opted in to default formatting.
+         ((when-let ((prettier (js-ts--find-local-bin "prettier")))
+            `(,prettier "--stdin-filepath" ,file)))))))
 
   (defun js-ts-format-buffer ()
     "Format the current buffer with the project's configured formatter."
     (interactive)
     (if-let ((cmd (js-ts--detect-formatter)))
-        (let* ((out-buf (generate-new-buffer " *js-ts-format*"))
-               (err-file (make-temp-file "js-ts-format-err-"))
-               (exit-code (apply #'call-process-region
-                                 (point-min) (point-max)
-                                 (car cmd) nil (list out-buf err-file) nil
-                                 (cdr cmd))))
+        (let (out-buf err-file)
           (unwind-protect
-              (if (zerop exit-code)
-                  (let ((new-content (with-current-buffer out-buf (buffer-string)))
-                        (old-content (buffer-substring-no-properties
-                                      (point-min) (point-max))))
-                    (unless (string= new-content old-content)
-                      (let ((pos (point)))
-                        (erase-buffer)
-                        (insert new-content)
-                        (goto-char (min pos (point-max))))))
-                (message "js-ts format: %s failed (exit %d): %s"
-                         (car cmd) exit-code
-                         (with-temp-buffer
-                           (insert-file-contents err-file)
-                           (string-trim (buffer-string)))))
-            (kill-buffer out-buf)
-            (delete-file err-file)))
+              (condition-case err
+                  (progn
+                    (setq out-buf (generate-new-buffer " *js-ts-format*"))
+                    (setq err-file (make-temp-file "js-ts-format-err-"))
+                    (let ((exit-code
+                           (apply #'call-process-region
+                                  (point-min) (point-max)
+                                  (car cmd) nil (list out-buf err-file) nil
+                                  (cdr cmd))))
+                      (if (equal exit-code 0)
+                          (let ((new-content
+                                 (with-current-buffer out-buf (buffer-string)))
+                                (old-content
+                                 (buffer-substring-no-properties
+                                  (point-min) (point-max))))
+                            (unless (string= new-content old-content)
+                              (let ((pos (point)))
+                                (erase-buffer)
+                                (insert new-content)
+                                (goto-char (min pos (point-max))))))
+                        (message "js-ts format: %s failed (status %s): %s"
+                                 (car cmd) exit-code
+                                 (with-temp-buffer
+                                   (insert-file-contents err-file)
+                                   (string-trim (buffer-string)))))))
+                (error
+                 (message "js-ts format: %s could not run: %s"
+                          (car cmd) (error-message-string err))))
+            (ignore-errors
+              (when (buffer-live-p out-buf)
+                (kill-buffer out-buf)))
+            (ignore-errors
+              (when (and err-file (file-exists-p err-file))
+                (delete-file err-file)))))
       (when (called-interactively-p 'any)
         (message "js-ts: no project formatter config found"))))
 
