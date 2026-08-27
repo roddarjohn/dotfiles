@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vanta": {
+      "url": "https://mcp.vanta.com/mcp",
+      "auth": "oauth",
+      "requestTimeoutMs": 60000
+    }
+  }
+}

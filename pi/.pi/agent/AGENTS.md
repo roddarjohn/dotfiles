@@ -86,7 +86,7 @@ This section is a permanent, explicit opt-in to multi-agent orchestration (ultra
 
 1. **The real thing** (copy/parity work): the actual product being matched. Blind side-by-side.
 2. **Best-in-class analog** (new work): the best existing example of this kind of deliverable, named explicitly. Judged side-by-side even though we are not copying it.
-3. **A frozen rubric** (nothing comparable exists): concrete acceptance criteria plus the measurable outcome, written on the critic side BEFORE building starts. Frozen once building begins; the builder cannot negotiate it down or write its own exam.
+3. **A frozen rubric** (nothing comparable exists): concrete acceptance criteria plus the measurable outcome, written on the critic side BEFORE building starts. Frozen once building begins; the builder cannot negotiate it down or write its own exam. Durable rubrics worth re-judging against in later sessions live in `~/plans/<org-or-parent>/<repo>/`; per-task rubrics live in `/tmp/<task>/`.
 
 No reference, no build. If you can't write down what "wowed" means for this task, that's a Confusion Protocol stop.
 
@@ -114,7 +114,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 
 At the end of every task, report one of:
 
-- **DONE** — All steps completed. Evidence provided for every claim. Tests in the diff. Skillify checklist green if a failure was promoted. Ready to merge.
+- **DONE** — All steps completed. Evidence provided for every claim. Tests in the diff for code changes (document deliverables are DONE when complete and verified — see "Plans and generated markdown"). Skillify checklist green if a failure was promoted. Ready to merge.
 - **DONE_WITH_CONCERNS** — Completed, but with issues Rodda should know about. List each concern with severity and a proposed follow-up.
 - **BLOCKED** — Cannot proceed. State what's blocking and what was already tried.
 - **NEEDS_CONTEXT** — Missing information required to continue. State exactly what's needed.
@@ -151,7 +151,19 @@ Progress percent, rate, and ETA are deterministic. Do not eyeball them in latent
 - A table with concrete before/after examples per category, so the change is legible at a glance.
 - A full before/after CSV written to `/tmp/`. Print the exact path in your final report.
 
-Everything for the job (status log, snapshot, report, CSV) lives under `/tmp/`. Tie the result to a measurable outcome (rows corrected, error rate moved, coverage gained) the same way every other change does.
+Everything for the job (status log, snapshot, report, CSV) lives under `/tmp/`. Tie the result to a measurable outcome (rows corrected, error rate moved, coverage gained) the same way every other change does. If the report is a durable deliverable worth resuming from in a later session, also write it to `~/plans/<org-or-parent>/<repo>/` (see "Plans and generated markdown").
+
+## Plans and generated markdown — ~/plans
+
+Plans, audits, reports, and other generated markdown documents do NOT live in repository working trees. They live in `~/plans`, organized by repository, mirroring the workspace path:
+
+- Location: `~/plans/<org-or-parent>/<repo>/` — e.g. work in `~/workspace/fsh/infra` writes to `~/plans/fsh/infra/`.
+- One file per deliverable, named for what it is (`policy-consolidation-plan.md`, `vanta-failing-tests.md`).
+- Future sessions resume from these files: when a plan exists for the task, read it there first, work from it, and update it in place as decisions land.
+- Reference plans and reports by absolute `~/plans/...` path in final reports.
+- Durable vs ephemeral: `~/plans` holds documents meant to be revisited (plans, audits, final reports, frozen rubrics Rodda will judge against later). Per-task scratch (job logs, snapshots, critic evidence under `/tmp/<task>/critique/`) stays in `/tmp` per those sections. A backfill's operational report lands in `/tmp`; if it is also a durable deliverable worth resuming from, write the durable version to `~/plans/<org-or-parent>/<repo>/`.
+- Document deliverables (plans, audits, reports) are DONE when the document is complete and its claims are verified (scripted checks where applicable). The "tests in the diff" rule applies to code changes; for documents the verification script or diff evidence is the proof.
+- Only put markdown inside a repo when it genuinely belongs to the repo (README, docs the repo ships). Never leave one-off plans or generated reports in a repo root.
 
 ## Confusion protocol
 
