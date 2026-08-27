@@ -1,7 +1,7 @@
 {
   "theme": "gruvbox-dark-hard",
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-sol",
+  "defaultProvider": "openrouter",
+  "defaultModel": "z-ai/glm-5.3-flash",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-subagents",
