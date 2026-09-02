@@ -559,6 +559,22 @@ Project management in emacs
    #+BEGIN_SRC emacs-lisp
   (use-package projectile
     :ensure t
+    :custom
+    ;; Use external `find' instead of Emacs-Lisp directory recursion; do not
+    ;; recurse into dependency/build trees.  Without this, Projectile can block
+    ;; Emacs for minutes with "Projectile is indexing ..." when it adopts a
+    ;; huge non-git directory (e.g. ~/workspace/fsh has ~470k files, ~ has a
+    ;; 52G Library) as a pseudo-project.
+    (projectile-indexing-method 'alien)
+    (projectile-enable-caching t)
+    ;; Keep the cached index fresh: register file-notify watches on cached
+    ;; projects so files created/deleted outside Emacs show up immediately
+    ;; instead of only after `projectile-invalidate-cache'.
+    (projectile-auto-update-cache-with-watches t)
+    (projectile-globally-ignored-directories
+     '(".git" ".hg" ".svn" "node_modules" ".venv" "venv" "__pycache__"
+       ".pytest_cache" "dist" "build" "target" ".next" "coverage"
+       ".cask" ".eldev" "elpa" "vendor" ".terraform"))
     :config
     (projectile-mode +1)
     (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map))
