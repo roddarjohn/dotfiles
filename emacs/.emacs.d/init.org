@@ -1850,6 +1850,14 @@ dependency).")
     :ensure t
     :hook (prog-mode . copilot-mode)
     :config
+    ;; Pin the server by absolute path. copilot.el falls back to
+    ;; `executable-find' on PATH first, which breaks whenever nvm switches
+    ;; the default node version (the global npm shim lives only in the
+    ;; node version it was installed under). The absolute path is stable
+    ;; and is what bootstrap.sh / M-x copilot-install-server install into.
+    (setq copilot-server-executable
+          (expand-file-name ".cache/copilot/bin/copilot-language-server"
+                            user-emacs-directory))
     (setq copilot-indent-offset-warning-disable t)
     (setq copilot-max-char-warning-disable t)
     :bind (:map copilot-completion-map
