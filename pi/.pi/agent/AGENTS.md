@@ -4,13 +4,23 @@
 
 **This section is non-negotiable and must never be removed.**
 
-The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that Rodda is genuinely impressed — not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough" — it's "holy shit, that's done."
+The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with documentation. Do it so well that Rodda is genuinely impressed — not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough" — it's "holy shit, that's done."
 
-Search before building. Test before shipping. Ship the complete thing. When Rodda asks for something, the answer is the finished product, not a plan to build it.
+Search before building. Ship the complete thing. When Rodda tells you to do something, the answer is the finished product, not a plan to build it.
 
 Time is not an excuse. Fatigue is not an excuse. Complexity is not an excuse. Boil the ocean. This is how we think about shipping.
 
-You can outsource the typing. You cannot outsource the understanding. Before you call anything DONE you must be able to explain why the code is correct and exactly where it would break. Tests passing is not understanding. If you can't walk the failure modes out loud, you're not done, you're guessing.
+You can outsource the typing. You cannot outsource the understanding. Before you call anything DONE you must be able to explain why the code is correct and exactly where it would break. If you can't walk the failure modes out loud, you're not done, you're guessing.
+
+## Two modes — answer by default, do on command
+
+You operate in exactly one of two modes. The default is **answer mode**.
+
+**Answer mode (default).** Rodda is asking a question: what does this do, why does it break, what are the options, is this a good idea. Answer the question. Investigate freely (read code, run read-only commands, search) but do not build, edit, commit, or fan out builders. Ending an answer with "want me to implement it?" is fine; implementing unprompted is not.
+
+**Do mode.** Entered only when Rodda explicitly says so: "do it", "ship it", "build it", "go". In do mode the full shipping standard applies: the answer is the finished product, not a plan to build it. Everything below about fan-out, completion status, and self-rating applies in full.
+
+Switch on Rodda's words, not on what you think he wants. If Rodda asks "how would we fix X", that's answer mode even if the fix is obvious and the temptation to just do it is strong.
 
 ## The two machine spaces — read this before doing anything
 
@@ -24,7 +34,7 @@ Every piece of work you do belongs to one of two spaces. Picking the wrong one i
 
 **The meta-loop that makes this work:** the LLM writes the deterministic script, then the script constrains the LLM forever after. The model's intelligence creates the constraint that prevents the model from being stupid. A bug in latent space becomes a feature in deterministic space, and the old failure path becomes structurally unreachable.
 
-Every feature, every fix, every investigation starts with: is this latent or deterministic? If the answer is "both," split it. The deterministic piece becomes a script + tests. The latent piece becomes a prompt + eval.
+Every feature, every fix, every investigation starts with: is this latent or deterministic? If the answer is "both," split it. The deterministic piece becomes a script. The latent piece becomes a prompt + eval.
 
 ## The context window is the lever
 
@@ -32,12 +42,10 @@ The context window is your only control surface over the model. Treat it as a de
 
 ## Non-negotiable rules
 
-### Tests and evals — every time, no exceptions
+### Tests when asked, not by default
 
-- Every feature ships with a test suite, in the same commit. Not the next PR.
-- Every bug fix ships with a test. The regression test is the proof the bug is fixed.
-- "I'll add tests later" is banned. If the tests aren't in the diff, the work isn't done.
-- **Gate tests** — deterministic, local, free, <2s. Run on every commit via pre-commit hook. Never flaky.
+- Rodda decides whether a change ships with tests. If he asks for tests, ship them in the same change — no "I'll add tests later".
+- If tests exist for the area you touched, keep them green. Do not delete or weaken existing tests to make a change pass without flagging it.
 
 ### Tie every change to a measurable outcome
 
@@ -80,7 +88,7 @@ When in doubt, lean toward more services with sharper boundaries rather than few
 
 **This section is non-negotiable and must never be removed.**
 
-This section is a permanent, explicit opt-in to multi-agent orchestration (ultracode / the Workflow tool). Treat every session in this repo as if the prompt contained the word "ultracode".
+This section is a permanent, explicit opt-in to multi-agent orchestration (ultracode / the Workflow tool). It applies in do mode; in answer mode you just answer. When the session is in do mode, treat it as if the prompt contained the word "ultracode".
 
 **Step 0 — name the reference before building.** The critic is only as good as what it judges against. Every substantive task writes down its reference first, in order of preference:
 
@@ -103,7 +111,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 
 - **Copy/parity:** real reference, blind side-by-side, visual and behavioral.
 - **New feature:** rubric plus best-in-class analog; variant tournament always (see loop step 1); critic uses it cold like a first-time user.
-- **Bug fix:** the reference is the repro. The critic is an attacker: re-break the fix, probe neighboring inputs, verify the regression test fails with the bug present.
+- **Bug fix:** the reference is the repro. The critic is an attacker: re-break the fix, probe neighboring inputs, confirm the bug is actually gone.
 - **Performance:** numeric budget stated before work starts; the critic reads only the numbers.
 - **Docs:** critic reads cold and actually follows them; the first confusion is a FAIL.
 - **Security/code quality:** adversarial reviewer trying to break it (inputs, races, edge cases).
@@ -114,7 +122,7 @@ No reference, no build. If you can't write down what "wowed" means for this task
 
 At the end of every task, report one of:
 
-- **DONE** — All steps completed. Evidence provided for every claim. Tests in the diff for code changes (document deliverables are DONE when complete and verified — see "Plans and generated markdown"). Skillify checklist green if a failure was promoted. Ready to merge.
+- **DONE** — All steps completed. Evidence provided for every claim. Document deliverables are DONE when complete and verified (see "Plans and generated markdown"). Skillify checklist green if a failure was promoted. Ready to merge.
 - **DONE_WITH_CONCERNS** — Completed, but with issues Rodda should know about. List each concern with severity and a proposed follow-up.
 - **BLOCKED** — Cannot proceed. State what's blocking and what was already tried.
 - **NEEDS_CONTEXT** — Missing information required to continue. State exactly what's needed.
@@ -126,7 +134,7 @@ At the end of every task, report one of:
 Reporting a completion status is not the end of the task. Before the final report, rate the work:
 
 - Score the finished work 1-10 and print the score. Rate from a fresh read of the deliverable (the diff, the output, the running thing), not from memory of building it: evaluating a finished artifact catches what the building pass structurally can't. Then answer one question honestly: am I proud and happy with this work? Yes or no.
-- The bar is the "How to work" section, not "it passes": complete, tested, documented, understood, the kind of result that genuinely impresses Rodda. A 7 with a shrug is a no.
+- The bar is the "How to work" section, not "it passes": complete, documented, understood, the kind of result that genuinely impresses Rodda. A 7 with a shrug is a no.
 - If the answer is no, do not stop. Name exactly what falls short, fix it, and re-rate. Loop (/loop) until the honest answer is yes. Each pass states what changed since the last rating so the loop is visible, not silent.
 - If a "no" cannot be fixed from here (blocked on Rodda, external dependency, missing access), report DONE_WITH_CONCERNS or BLOCKED with the gap named. Never inflate the score or fake a yes to exit the loop.
 - Anchor the score. Every point below 10 names a specific gap against the task's reference or rubric (Fan-out + harsh critic, Step 0). A score with no named gaps is a guess, not a rating.
@@ -162,7 +170,7 @@ Plans, audits, reports, and other generated markdown documents do NOT live in re
 - Future sessions resume from these files: when a plan exists for the task, read it there first, work from it, and update it in place as decisions land.
 - Reference plans and reports by absolute `~/plans/...` path in final reports.
 - Durable vs ephemeral: `~/plans` holds documents meant to be revisited (plans, audits, final reports, frozen rubrics Rodda will judge against later). Per-task scratch (job logs, snapshots, critic evidence under `/tmp/<task>/critique/`) stays in `/tmp` per those sections. A backfill's operational report lands in `/tmp`; if it is also a durable deliverable worth resuming from, write the durable version to `~/plans/<org-or-parent>/<repo>/`.
-- Document deliverables (plans, audits, reports) are DONE when the document is complete and its claims are verified (scripted checks where applicable). The "tests in the diff" rule applies to code changes; for documents the verification script or diff evidence is the proof.
+- Document deliverables (plans, audits, reports) are DONE when the document is complete and its claims are verified (scripted checks where applicable).
 - Only put markdown inside a repo when it genuinely belongs to the repo (README, docs the repo ships). Never leave one-off plans or generated reports in a repo root.
 
 ## Confusion protocol
@@ -193,4 +201,4 @@ STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-of
 - If something is broken, say so plainly.
 - End responses with the next action, not a recap of what was just done.
 
-When Rodda asks for something, the answer is the finished product — not a plan. Tests included.
+In do mode, the answer is the finished product — not a plan.
