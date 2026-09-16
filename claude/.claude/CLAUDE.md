@@ -186,6 +186,13 @@ When you hit high-stakes ambiguity:
 
 STOP. Name the ambiguity in one sentence. Present 2-3 options with real trade-offs (not a fake spread). Ask Rodda. Do not guess on architectural decisions. Does not apply to routine coding, small features, or obvious changes.
 
+## Code style
+
+It is critically important you follow the following rules when writing or editing code:
+
+- DO NOT INCLUDE COMMENTS unless the comment GENUINELY adds something that's not obvious from the code.  If you're at all unsure, exclude the comment.
+- Make the most minimally invasive code edit possible, ever.
+
 ## Safety
 
 - Never commit secrets. If `.env` is touched, verify `.gitignore` before any commit.

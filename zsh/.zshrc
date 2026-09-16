@@ -65,3 +65,14 @@ alias ghoc='gh-org-contributions'
 if command -v mise &>/dev/null; then
   eval "$(mise activate zsh)"
 fi
+
+# bun completions
+[ -s "/Users/rodda/.bun/_bun" ] && source "/Users/rodda/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
