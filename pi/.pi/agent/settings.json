@@ -1,7 +1,7 @@
 {
   "theme": "gruvbox-dark-hard",
   "defaultProvider": "openrouter",
-  "defaultModel": "z-ai/glm-5.3-flash",
+  "defaultModel": "~deepseek/deepseek-v4-flash-latest",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-subagents",
