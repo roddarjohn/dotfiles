@@ -1189,9 +1189,28 @@ I don't fully use this right now. Perhaps I should.
 
 * jsonnet
 #+begin_src emacs-lisp
+  (defun my/fsh-jsonnet-lsp-command (_interactive)
+    "Return a startup command for fsh-jsonnet-lsp from the project venv."
+    (or (when-let ((proj (project-current)))
+          (let ((dev (expand-file-name
+                      ".venv/bin/fsh-jsonnet-lsp"
+                      (project-root proj))))
+            (and (file-executable-p dev) (list dev))))
+        (when-let ((path (executable-find "fsh-jsonnet-lsp")))
+          (list path))))
+
+  (defun my/jsonnet-format-on-save ()
+    "Format the current jsonnet buffer before save, via its LSP server."
+    (when (eglot-current-server)
+      (eglot-format-buffer)))
+
+  (defun my/jsonnet-enable-format-on-save ()
+    (add-hook 'before-save-hook #'my/jsonnet-format-on-save nil t))
+
   (use-package jsonnet-mode
     :mode "\\.jsonnet\\'"
-    :hook (jsonnet-mode . my/eglot-ensure-maybe))
+    :hook (jsonnet-mode . my/eglot-ensure-maybe)
+    :hook (jsonnet-mode . my/jsonnet-enable-format-on-save))
 #+end_src
 
 * rego
@@ -1514,7 +1533,7 @@ I don't fully use this right now. Perhaps I should.
     ;; surfaced here anyway.
     (add-to-list 'eglot-ignored-server-capabilities :documentHighlightProvider)
     (add-to-list 'eglot-server-programs
-                 '(jsonnet-mode . ("jsonnet-language-server" "-t" "--lint")))
+                 '(jsonnet-mode . my/fsh-jsonnet-lsp-command))
     (add-to-list 'eglot-server-programs
                  '((js-ts-mode typescript-ts-mode tsx-ts-mode)
                    . ("typescript-language-server" "--stdio")))
