@@ -1190,14 +1190,22 @@ I don't fully use this right now. Perhaps I should.
 * jsonnet
 #+begin_src emacs-lisp
   (defun my/fsh-jsonnet-lsp-command (_interactive)
-    "Return a startup command for fsh-jsonnet-lsp from the project venv."
-    (or (when-let ((proj (project-current)))
-          (let ((dev (expand-file-name
-                      ".venv/bin/fsh-jsonnet-lsp"
-                      (project-root proj))))
-            (and (file-executable-p dev) (list dev))))
-        (when-let ((path (executable-find "fsh-jsonnet-lsp")))
-          (list path))))
+    "Return a startup command for fsh-jsonnet-lsp."
+    (or
+     ;; The current project's venv, when it pulls fsh-jsonnet-lsp as a dep.
+     (when-let ((proj (project-current)))
+       (let ((dev (expand-file-name
+                   ".venv/bin/fsh-jsonnet-lsp"
+                   (project-root proj))))
+         (and (file-executable-p dev) (list dev))))
+     ;; The checkout venv (live editable code) as a dev fallback.
+     (let ((dev (expand-file-name
+                 "fsh/jsonnet-lsp/.venv/bin/fsh-jsonnet-lsp"
+                 "~/workspace")))
+       (and (file-executable-p dev) (list dev)))
+     ;; Whatever is on PATH (an installed wheel).
+     (when-let ((path (executable-find "fsh-jsonnet-lsp")))
+       (list path))))
 
   (defun my/jsonnet-format-on-save ()
     "Format the current jsonnet buffer before save, via its LSP server."
@@ -1325,6 +1333,36 @@ I don't fully use this right now. Perhaps I should.
     (add-hook 'before-save-hook #'my/just-format-buffer nil t))
 
   (add-hook 'just-ts-mode-hook #'my/just-setup)
+#+end_src
+
+* bazel / starlark
+  =bazel.el= (the =bazel= package; developed at
+  [[https://github.com/bazel-contrib/bazel.el][bazel-contrib/bazel.el]])
+  provides a major mode for every Bazel file type: =BUILD= / =BUILD.bazel=
+  (=bazel-build-mode=), =WORKSPACE= / =WORKSPACE.bazel=, =MODULE.bazel=,
+  =REPO.bazel=, =VENDOR.bazel=, =*.bzl= Starlark (=bazel-starlark-mode=),
+  plus =bazelrc-mode=, =bazelignore-mode= and =bazeliskrc-mode=.  All are
+  registered by the package's autoloads, so no =:mode= entries are needed.
+
+  There is no maintained Starlark language server (the candidates, e.g.
+  =cgrindel/starlark-language-server= and =starlsp=, are abandoned or
+  untried), so these modes deliberately skip Eglot.  The package ships its
+  own tooling instead, all built on [[https://github.com/bazelbuild/buildtools][buildifier]]: flymake diagnostics
+  (=buildifier -mode=check -lint=warn=), format on save
+  (=bazel-buildifier-before-save=, enabled below only when the binary is
+  installed), xref, and completion.  Install =buildifier= via =bootstrap.sh=
+  or from [[https://github.com/bazelbuild/buildtools/releases][its releases page]].
+
+  =bazel-build= / =bazel-test= / =bazel-coverage= / =bazel-run= (C-c C-b /
+  C-c C-t / C-c C-c / C-c C-r) run Bazel on the current package; the =bazel=
+  binary is resolved from PATH, so install Bazel per project, e.g.
+  =mise use bazel@latest= (=mise= itself is installed by =bootstrap.sh=).
+#+begin_src emacs-lisp
+  (use-package bazel
+    :defer t
+    :config
+    (when (executable-find "buildifier")
+      (setq bazel-buildifier-before-save t)))
 #+end_src
 
 * jinja2 templates

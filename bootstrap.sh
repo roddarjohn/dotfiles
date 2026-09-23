@@ -21,6 +21,7 @@
 #  11. mise (runtime/tool manager)        (optional, prompted)
 #  12. syncthing                          (optional, prompted)
 #  13. pi (coding agent CLI)              (optional, prompted; needs npm)
+#  14. buildifier (Bazel/Starlark fmt)    (optional, prompted)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -684,6 +685,51 @@ else
             fi
             ;;
         *) skip "pi" ;;
+    esac
+fi
+
+# ── 14. buildifier — Bazel/Starlark formatter & linter (optional) ─────
+# Backs the Emacs bazel modes: flymake diagnostics + format on save.
+# (No Starlark language server exists; see init.org "bazel / starlark".)
+section "14. buildifier (optional)"
+if [ -x "$HOME/.local/bin/buildifier" ]; then
+    skip "buildifier already at ~/.local/bin"
+else
+    read -r -p "Install buildifier (Bazel/Starlark formatter) from GitHub releases? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            ARCH="$(uname -m)"
+            case "$PLATFORM-$ARCH" in
+                linux-x86_64)        BUILDIFIER_ASSET="buildifier-linux-amd64" ;;
+                linux-aarch64)       BUILDIFIER_ASSET="buildifier-linux-arm64" ;;
+                darwin-x86_64)       BUILDIFIER_ASSET="buildifier-darwin-amd64" ;;
+                darwin-arm64)        BUILDIFIER_ASSET="buildifier-darwin-arm64" ;;
+                *)                   BUILDIFIER_ASSET="" ;;
+            esac
+            if [ -z "$BUILDIFIER_ASSET" ]; then
+                warn "No matching release asset for $PLATFORM/$ARCH; skipping"
+            else
+                step "Resolving latest release URL for $BUILDIFIER_ASSET"
+                BUILDIFIER_URL=$(curl -fsSL \
+                    https://api.github.com/repos/bazelbuild/buildtools/releases/latest \
+                    | grep -Eo "https://[^\"]*${BUILDIFIER_ASSET}" \
+                    | head -n1)
+                if [ -z "${BUILDIFIER_URL:-}" ]; then
+                    warn "Could not find $BUILDIFIER_ASSET in latest release; skipping"
+                else
+                    mkdir -p "$HOME/.local/bin"
+                    step "Downloading $BUILDIFIER_URL"
+                    curl -fsSL "$BUILDIFIER_URL" -o "$HOME/.local/bin/buildifier"
+                    chmod +x "$HOME/.local/bin/buildifier"
+                    ok "buildifier installed to ~/.local/bin"
+                    case ":${PATH:-}:" in
+                        *":$HOME/.local/bin:"*) ;;
+                        *) warn "Add ~/.local/bin to your PATH to use buildifier" ;;
+                    esac
+                fi
+            fi
+            ;;
+        *) skip "buildifier" ;;
     esac
 fi
 

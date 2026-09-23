@@ -16,7 +16,7 @@ running `install.sh`, installing the pinned Python LSP stack (uv,
 rassumfrassum, BasedPyright, and a cached Zuban fallback), and (optionally,
 with prompts) installing
 `jsonnet-language-server`, `regal`, `tofu-ls`, `terragrunt-ls`,
-`copilot-language-server`, `mise`, `syncthing`, and the `pi` coding agent
+`buildifier`, `copilot-language-server`, `mise`, `syncthing`, and the `pi` coding agent
 CLI. Each phase is idempotent, so
 re-running is safe. Expect ~1 hour on a fresh machine (most of it
 waiting on the Emacs build).
@@ -244,6 +244,28 @@ tar -xzf terragrunt-ls_*.tar.gz -C ~/.local/bin/ terragrunt-ls
 ```
 
 Make sure `~/.local/bin` is on your `PATH`.
+
+#### buildifier (Bazel / Starlark)
+
+Bazel files (`BUILD` / `BUILD.bazel`, `WORKSPACE` / `WORKSPACE.bazel`,
+`MODULE.bazel`, `REPO.bazel`, `VENDOR.bazel`, `*.bzl` Starlark, `.bazelrc`,
+`.bazelignore`, `.bazeliskrc`) are handled by the
+[`bazel`](https://github.com/bazel-contrib/bazel.el) MELPA package. There is
+no maintained Starlark language server, so these modes skip Eglot and use
+[buildifier](https://github.com/bazelbuild/buildtools) instead: flymake
+diagnostics, format on save, xref, and completion. Download a pre-built
+binary from the [releases page](https://github.com/bazelbuild/buildtools/releases):
+
+```bash
+chmod +x buildifier
+mv buildifier ~/.local/bin/
+```
+
+Make sure `~/.local/bin` is on your `PATH`.
+
+The `bazel` CLI itself is not bundled; install it per project (e.g.
+`mise use bazel@latest`) to use the in-buffer build/test/coverage/run
+commands (`bazel-build` etc.).
 
 
 ## Post-install
