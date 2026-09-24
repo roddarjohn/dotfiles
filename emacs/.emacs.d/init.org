@@ -557,6 +557,50 @@ This is the default configuration that comes from the documentation
 Project management in emacs
 
    #+BEGIN_SRC emacs-lisp
+  ;; Monorepo helpers shared with the eglot setup below.  A "sub-project"
+  ;; is the nearest directory holding a language manifest; the enclosing
+  ;; .git root is the whole repository.  Vendored trees (node_modules,
+  ;; .venv, site-packages) never define a sub-project.
+  (defconst my/monorepo-manifests
+    '("pyproject.toml" "package.json" "tsconfig.json")
+    "Files that mark a sub-project boundary inside the monorepo.")
+
+  (defvar my/project-vendored-dir-re
+    "/\\(?:node_modules\\|site-packages\\|\\.venv\\)/"
+    "Regexp matching vendored/library trees that never define a project root.")
+
+  (defun my/git-root (dir)
+    "Return the outermost .git repository root containing DIR, or nil."
+    (let ((root nil)
+          (current (file-name-as-directory (expand-file-name dir))))
+      (while current
+        (when (file-exists-p (expand-file-name ".git" current))
+          (setq root current))
+        (let ((parent (file-name-parent-directory current)))
+          (setq current (and (not (equal parent current)) parent))))
+      (and root (expand-file-name root))))
+
+  (defun my/monorepo-subproject-root (dir)
+    "Return the nearest ancestor manifest dir (sub-project) of DIR, or nil."
+    (let ((dir (file-name-as-directory (expand-file-name dir))))
+      (unless (string-match-p my/project-vendored-dir-re dir)
+        (when-let ((root (locate-dominating-file
+                          dir
+                          (lambda (d)
+                            (seq-some
+                             (lambda (f) (file-exists-p (expand-file-name f d)))
+                             my/monorepo-manifests)))))
+          (expand-file-name root)))))
+
+  (defun my/projectile-find-file-in-repo ()
+    "Jump to a file anywhere under the .git root (the whole monorepo)."
+    (interactive)
+    (if-let ((root (my/git-root default-directory)))
+        (cl-letf (((symbol-function 'projectile-project-root)
+                   (lambda (&optional _dir) root)))
+          (call-interactively #'projectile-find-file))
+      (user-error "Not inside a git repository")))
+
   (use-package projectile
     :ensure t
     :custom
@@ -575,9 +619,22 @@ Project management in emacs
      '(".git" ".hg" ".svn" "node_modules" ".venv" "venv" "__pycache__"
        ".pytest_cache" "dist" "build" "target" ".next" "coverage"
        ".cask" ".eldev" "elpa" "vendor" ".terraform"))
+    ;; `C-c p f' searches the sub-project: the nearest manifest dir wins
+    ;; over the enclosing .git root.  An explicit `.projectile' marker or
+    ;; buffer-local root still takes precedence.
+    (projectile-project-root-functions
+     '(projectile-root-local
+       projectile-root-marked
+       my/monorepo-subproject-root
+       projectile-root-bottom-up
+       projectile-root-top-down
+       projectile-root-top-down-recurring))
     :config
     (projectile-mode +1)
-    (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map))
+    (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+    ;; `C-c p F' searches the whole .git repo (default was
+    ;; `projectile-find-file-in-known-projects').
+    (define-key projectile-command-map (kbd "F") #'my/projectile-find-file-in-repo))
 
   (use-package consult-projectile
     :ensure t
@@ -1510,37 +1567,13 @@ I don't fully use this right now. Perhaps I should.
         eglot-sync-connect 1
         eglot-autoshutdown t)
 
-  ;; Monorepo-aware project root: when a buffer lives under a
-  ;; directory that contains a language-specific manifest
-  ;; (pyproject.toml, package.json, tsconfig.json, .regal,
-  ;; .terraform.lock.hcl), prefer that
-  ;; directory over the enclosing .git root.  Eglot uses
-  ;; `project-current' to decide where to spawn the LSP server, so
-  ;; without this it launches the Python / TypeScript language server at
-  ;; the repo root and they fail to find their config.
-  ;;
-  ;; Vendored trees are excluded: every package in node_modules ships
-  ;; its own package.json, so without the guard a go-to-definition
-  ;; that lands in a library .d.ts would root a project -- and spawn a
-  ;; full tsserver session -- inside node_modules.
-  (defvar my/project-vendored-dir-re
-    "/\\(?:node_modules\\|site-packages\\|\\.venv\\)/"
-    "Regexp matching vendored/library trees that never define a project root.")
-
-  (defun my/project-try-manifest (dir)
-    "Find LSP-relevant project root by walking up from DIR for manifests."
-    (unless (string-match-p my/project-vendored-dir-re
-                            (file-name-as-directory (expand-file-name dir)))
-      (when-let* ((root (locate-dominating-file
-                         dir
-                         (lambda (d)
-                           (seq-some
-                            (lambda (f) (file-exists-p (expand-file-name f d)))
-                            '("pyproject.toml" "package.json" "tsconfig.json"
-                              ".regal" ".terraform.lock.hcl"))))))
-        (cons 'transient (expand-file-name root)))))
-
-  (add-hook 'project-find-functions #'my/project-try-manifest -90)
+  ;; Eglot's project root is the enclosing .git root (project.el's
+  ;; default VCS root), so each language server starts with its cwd and
+  ;; rootUri at the monorepo root and finds its config there.  The Python
+  ;; and TypeScript contacts below source their executables from that
+  ;; same root's `.venv' / `node_modules'.  The monorepo helpers
+  ;; (`my/monorepo-manifests', `my/project-vendored-dir-re',
+  ;; `my/git-root') are defined in the projectile section above.
 
   (transient-define-prefix my/eglot-transient ()
     "Dispatcher for eglot commands (LSP features, refactors, server admin)."
@@ -1565,6 +1598,18 @@ I don't fully use this right now. Perhaps I should.
       ("E" "Events buffer"    eglot-events-buffer)
       ("L" "Stderr buffer"    eglot-stderr-buffer)]])
 
+  (defun my/typescript-eglot-contact (&optional _interactive project)
+    "Run typescript-language-server from the monorepo node_modules."
+    (let* ((root (if project
+                     (expand-file-name (project-root project))
+                   (or (my/git-root default-directory)
+                       (expand-file-name default-directory))))
+           (server (expand-file-name
+                    "node_modules/.bin/typescript-language-server" root)))
+      (unless (file-executable-p server)
+        (user-error "typescript-language-server not found at %s; add it as a dev dependency and run `npm install'" server))
+      (list server "--stdio")))
+
   (with-eval-after-load 'eglot
     ;; documentHighlight re-requests every occurrence of the symbol at point
     ;; on each cursor idle -- costly in large files, and the highlights aren't
@@ -1574,7 +1619,7 @@ I don't fully use this right now. Perhaps I should.
                  '(jsonnet-mode . my/fsh-jsonnet-lsp-command))
     (add-to-list 'eglot-server-programs
                  '((js-ts-mode typescript-ts-mode tsx-ts-mode)
-                   . ("typescript-language-server" "--stdio")))
+                   . my/typescript-eglot-contact))
     (add-to-list 'eglot-server-programs
                  '((css-mode css-ts-mode)
                    . ("vscode-css-language-server" "--stdio")))
@@ -1649,8 +1694,8 @@ I don't fully use this right now. Perhaps I should.
   (defun my/eglot-server-available-p ()
     "Non-nil when the eglot server for this buffer's mode is usable.
 Looks up `eglot-server-programs' for the current major mode.  A plain
-command list must have its program on PATH; function and absolute-path
-contacts carry their own guards, so they are allowed."
+command list must have its program on PATH; a function contact must
+return a non-nil contact without signalling."
     (require 'eglot)
     (let ((contact
            (catch 'hit
@@ -1663,7 +1708,10 @@ contacts carry their own guards, so they are allowed."
                         (if (listp modes) modes (list modes)))
                    (throw 'hit (cdr entry))))))))
       (cond ((null contact) nil)
-            ((functionp contact) t)
+            ((functionp contact)
+             (condition-case nil
+                 (and (funcall contact) t)
+               (error nil)))
             ((and (consp contact) (stringp (car contact)))
              (let ((prog (car contact)))
                (or (file-name-absolute-p prog)
@@ -1694,127 +1742,59 @@ contacts carry their own guards, so they are allowed."
    Rass's streaming pull diagnostics to the standard push notifications that
    Emacs 30 understands.
 
-   The nearest ancestor =.venv= with an executable Python is activated for the
-   whole composite process. BasedPyright and Zuban are loaded from that venv
-   when installed there; otherwise the bootstrapped BasedPyright and cached
-   =zuban==0.9.1= fallback run against the same activated environment. This
-   keeps editable and related workspace imports visible to both servers.
-   Inherited Python paths plus uv/pip index, no-index, strategy, and find-links
-   variables are removed; uv uses explicit public PyPI with the =first-index=
-   strategy. Dynamic file watching stays disabled because Eglot can otherwise
-   exhaust descriptors in generated repositories. =bootstrap.sh= installs the
-   pinned global router and fallback tools.
+   BasedPyright and Zuban are dev dependencies, so both live in the venv at
+   the =.git= root (=.venv/bin/=) where =uv sync= installs them.  The contact
+   below resolves that root from Eglot's project and runs the two servers
+   under =rass= with the venv activated.  Dynamic file watching stays disabled
+   because Eglot can otherwise exhaust descriptors in generated repositories.
+   =bootstrap.sh= installs the =rass= router; the language servers themselves
+   come only from the project venv.
 #+name: python-lsp-composite
 #+begin_src emacs-lisp
   (defconst my/python-lsp-routing-directory
     (expand-file-name "lsp/" user-emacs-directory)
     "Directory containing the tracked Rass Python routing module.")
 
-  (defconst my/zuban-fallback-version "0.9.1"
-    "Zuban version used when a project has no executable local server.")
-
-  (defun my/python-path-without-virtualenv-bin (directories virtualenv)
-    "Remove VIRTUALENV's bin directory from DIRECTORIES."
-    (if (not virtualenv)
-        directories
-      (let ((venv-bin
-             (directory-file-name
-              (expand-file-name "bin" virtualenv))))
-        (seq-remove
-         (lambda (directory)
-           (equal venv-bin
-                  (directory-file-name (expand-file-name directory))))
-         directories))))
-
-  (defun my/python-eglot-contact (&optional _interactive _project)
-    "Run BasedPyright and Zuban against the nearest workspace virtualenv."
-    (let* ((root default-directory)
-           (inherited-venv (getenv "VIRTUAL_ENV"))
-           (clean-path
-            (my/python-path-without-virtualenv-bin
-             (split-string (or (getenv "PATH") "") path-separator t)
-             inherited-venv))
-           (exec-path
-            (my/python-path-without-virtualenv-bin exec-path inherited-venv))
-           (venv-root
-            (locate-dominating-file
-             root
-             (lambda (dir)
-               (file-executable-p
-                (expand-file-name ".venv/bin/python" dir)))))
-           (venv (and venv-root
-                      (expand-file-name ".venv" venv-root)))
-           (venv-bin (and venv (expand-file-name "bin" venv)))
-           (local-basedpyright
-            (and venv-bin
-                 (expand-file-name "basedpyright-langserver" venv-bin)))
-           (local-zuban (and venv-bin (expand-file-name "zuban" venv-bin)))
+  (defun my/python-eglot-contact (&optional _interactive project)
+    "Run BasedPyright + Zuban from the venv at the .git root.
+BasedPyright (completion) is first and Zuban (diagnostics) second; both
+are dev dependencies, so their executables live in `.venv/bin' at the
+repository root PROJECT."
+    (let* ((root (if project
+                     (expand-file-name (project-root project))
+                   (or (my/git-root default-directory)
+                       (expand-file-name default-directory))))
+           (venv (expand-file-name ".venv" root))
+           (venv-bin (expand-file-name "bin" venv))
+           (basedpyright (expand-file-name "basedpyright-langserver" venv-bin))
+           (zuban (expand-file-name "zuban" venv-bin))
            (router (expand-file-name "rass_zuban.py"
                                      my/python-lsp-routing-directory))
            (rass (executable-find "rass"))
-           (basedpyright
-            (or (and local-basedpyright
-                     (file-executable-p local-basedpyright)
-                     local-basedpyright)
-                (executable-find "basedpyright-langserver")))
-           (env (executable-find "env"))
-           (uvx (executable-find "uvx"))
-           (zuban-command
-            (if (and local-zuban (file-executable-p local-zuban))
-                (list local-zuban "server")
-              (unless uvx
-                (user-error
-                 "uvx is required when the workspace venv has no zuban; rerun bootstrap.sh"))
-              (message "[python-lsp] no workspace Zuban above %s; using uvx %s"
-                       root my/zuban-fallback-version)
-              (list uvx
-                    "--no-config"
-                    "--index-strategy" "first-index"
-                    "--default-index" "https://pypi.org/simple"
-                    "--from" (concat "zuban==" my/zuban-fallback-version)
-                    "zuban" "server"))))
+           (env (executable-find "env")))
+      (dolist (exe (list basedpyright zuban))
+        (unless (file-executable-p exe)
+          (user-error "%s is missing; add the Python LSP dev dependencies to %s and run `uv sync'" exe root)))
       (unless (file-readable-p router)
         (user-error "Python LSP router is missing: %s; restore dotfiles or rerun stow" router))
-      (unless env
-        (user-error "env executable is required for Python LSP startup"))
       (unless rass
         (user-error "rass is missing; rerun bootstrap.sh"))
-      (unless basedpyright
-        (user-error "basedpyright-langserver is missing; rerun bootstrap.sh"))
+      (unless env
+        (user-error "env executable is required for Python LSP startup"))
       (cons
        'my/python-eglot-server
-       (append
-        (list env
-              "-u" "UV_INDEX"
-              "-u" "UV_DEFAULT_INDEX"
-              "-u" "UV_EXTRA_INDEX_URL"
-              "-u" "UV_INDEX_URL"
-              "-u" "UV_FIND_LINKS"
-              "-u" "UV_NO_INDEX"
-              "-u" "UV_INDEX_STRATEGY"
-              "-u" "PIP_INDEX_URL"
-              "-u" "PIP_EXTRA_INDEX_URL"
-              "-u" "PIP_FIND_LINKS"
-              "-u" "PIP_NO_INDEX"
-              "-u" "PYTHONHOME"
-              "-u" "VIRTUAL_ENV")
-        (when venv
-          (list (concat "VIRTUAL_ENV=" venv)))
-        (list (concat "PATH="
-                      (mapconcat #'identity
-                                 (if venv
-                                     (cons venv-bin clean-path)
-                                   clean-path)
-                                 path-separator))
-              (concat "PYTHONPATH=" my/python-lsp-routing-directory)
-              rass
-              "--stream-diagnostics"
-              "--log-level" "warn"
-              "--logic-class" "rass_zuban.PythonRoutingLogic"
-              "--"
-              basedpyright "--stdio"
-              "--")
-        zuban-command))))
+       (list env
+             (concat "VIRTUAL_ENV=" venv)
+             (concat "PATH=" venv-bin path-separator (or (getenv "PATH") ""))
+             (concat "PYTHONPATH=" my/python-lsp-routing-directory)
+             rass
+             "--stream-diagnostics"
+             "--log-level" "warn"
+             "--logic-class" "rass_zuban.PythonRoutingLogic"
+             "--"
+             basedpyright "--stdio"
+             "--"
+             zuban "server"))))
 
   (with-eval-after-load 'eglot
     (defclass my/python-eglot-server (eglot-lsp-server) ())
