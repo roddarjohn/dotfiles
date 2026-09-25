@@ -631,6 +631,13 @@ Project management in emacs
        projectile-root-top-down-recurring))
     :config
     (projectile-mode +1)
+    ;; projectile-mode hooks `project-projectile' into
+    ;; `project-find-functions', which would make project.el (and eglot,
+    ;; which roots via `project-current') adopt projectile's sub-project
+    ;; root.  Eglot must root at the .git root, so drop the bridge:
+    ;; project.el keeps the .git root, projectile keeps the sub-project
+    ;; root for its own C-c p commands.
+    (remove-hook 'project-find-functions #'project-projectile)
     (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
     ;; `C-c p F' searches the whole .git repo (default was
     ;; `projectile-find-file-in-known-projects').
@@ -1242,6 +1249,32 @@ I don't fully use this right now. Perhaps I should.
                typescript-ts-mode-hook
                tsx-ts-mode-hook))
     (add-hook h #'js-ts-enable-format-on-save))
+#+end_src
+
+* json
+  Force =json-ts-mode= (Emacs 30 tree-sitter) for =.json= files: this
+  build's default multiplexer hands them to =js-json-mode= (js.el),
+  which never runs the tree-sitter mode or its hooks. Indentation is
+  two spaces, set explicitly here. Format on save via the built-in
+  =json-pretty-print-buffer= (json.el): it round-trips through the JSON
+  reader with key order preserved (alist + string keys), so no external
+  tooling and no config file discovery needed. A buffer that fails to
+  parse is left untouched apart from the pretty-printer's partial
+  prefix, matching the region behavior of the function.
+#+begin_src emacs-lisp
+  (add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
+  (require 'json)
+  (setq json-ts-mode-indent-offset 2)
+
+  (defun my/json-format-on-save ()
+    "Pretty-print the current JSON buffer with json.el."
+    (when (derived-mode-p 'json-ts-mode)
+      (json-pretty-print-buffer)))
+
+  (defun my/json-enable-format-on-save ()
+    (add-hook 'before-save-hook #'my/json-format-on-save nil t))
+
+  (add-hook 'json-ts-mode-hook #'my/json-enable-format-on-save)
 #+end_src
 
 * jsonnet
