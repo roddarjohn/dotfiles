@@ -1,7 +1,7 @@
 {
   "theme": "gruvbox-dark-hard",
   "defaultProvider": "openrouter",
-  "defaultModel": "~deepseek/deepseek-v4-flash-latest",
+  "defaultModel": "~deepseek/deepseek-pro-latest",
   "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-subagents",
@@ -13,5 +13,5 @@
     "npm:pi-powerline-footer",
     "git:github.com/hasit/pi-community-themes"
   ],
-  "lastChangelogVersion": "0.85.1"
+  "lastChangelogVersion": "0.87.1"
 }

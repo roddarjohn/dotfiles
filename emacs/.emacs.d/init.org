@@ -414,8 +414,8 @@ This is simply the default configuration available on the github.
   	   ;; M-s bindings in `search-map'
   	   ("M-s d" . consult-find)                  ;; Alternative: consult-fd
   	   ("M-s D" . consult-locate)
-  	   ("M-s g" . consult-grep)
-  	   ("M-s G" . consult-git-grep)
+           ("M-s g" . my/consult-git-grep-project)
+           ("M-s G" . my/consult-git-grep-repo)
   	   ("M-s r" . consult-ripgrep)
   	   ("C-s"   . consult-line)
   	   ("M-s l" . consult-line)
@@ -562,7 +562,7 @@ Project management in emacs
   ;; .git root is the whole repository.  Vendored trees (node_modules,
   ;; .venv, site-packages) never define a sub-project.
   (defconst my/monorepo-manifests
-    '("pyproject.toml" "package.json" "tsconfig.json")
+    '("pyproject.toml" "package.json" "project.json" "tsconfig.json")
     "Files that mark a sub-project boundary inside the monorepo.")
 
   (defvar my/project-vendored-dir-re
@@ -591,6 +591,20 @@ Project management in emacs
                              (lambda (f) (file-exists-p (expand-file-name f d)))
                              my/monorepo-manifests)))))
           (expand-file-name root)))))
+
+  (defun my/consult-git-grep-project ()
+    "Search the current Projectile project with `git grep'."
+    (interactive)
+    (if-let ((root (projectile-project-root)))
+        (consult-git-grep root)
+      (user-error "Not inside a project")))
+
+  (defun my/consult-git-grep-repo ()
+    "Search the whole Git repository with `git grep'."
+    (interactive)
+    (if-let ((root (my/git-root default-directory)))
+        (consult-git-grep root)
+      (user-error "Not inside a git repository")))
 
   (defun my/projectile-find-file-in-repo ()
     "Jump to a file anywhere under the .git root (the whole monorepo)."
@@ -1255,20 +1269,49 @@ I don't fully use this right now. Perhaps I should.
   Force =json-ts-mode= (Emacs 30 tree-sitter) for =.json= files: this
   build's default multiplexer hands them to =js-json-mode= (js.el),
   which never runs the tree-sitter mode or its hooks. Indentation is
-  two spaces, set explicitly here. Format on save via the built-in
-  =json-pretty-print-buffer= (json.el): it round-trips through the JSON
-  reader with key order preserved (alist + string keys), so no external
-  tooling and no config file discovery needed. A buffer that fails to
-  parse is left untouched apart from the pretty-printer's partial
-  prefix, matching the region behavior of the function.
+  two spaces, set explicitly here. Format on save strips trailing
+  commas first (a char scan that never touches commas inside string
+  values), then round-trips the buffer through the built-in
+  =json-pretty-print-buffer= (json.el): key order preserved (alist +
+  string keys), no external tooling, no config file discovery. A
+  buffer that still fails to parse is not formatted; only its trailing
+  commas are gone.
 #+begin_src emacs-lisp
   (add-to-list 'auto-mode-alist '("\\.json\\'" . json-ts-mode))
   (require 'json)
   (setq json-ts-mode-indent-offset 2)
 
+  (defun my/json-strip-trailing-commas ()
+    "Remove commas directly before a closing brace or bracket.
+  A char scan tracks string state (escaped quotes included), so commas
+  inside string values are never touched."
+    (save-excursion
+      (goto-char (point-min))
+      (let ((in-string nil)
+            (escaped nil))
+        (while (< (point) (point-max))
+          (let ((c (char-after)))
+            (cond
+             (in-string
+              (cond
+               (escaped (setq escaped nil))
+               ((eq c ?\\) (setq escaped t))
+               ((eq c ?\") (setq in-string nil))))
+             ((eq c ?\")
+              (setq in-string t))
+             ((eq c ?,)
+              (let ((after (save-excursion
+                             (forward-char 1)
+                             (skip-chars-forward " \t\r\n")
+                             (char-after))))
+                (when (memq after '(?} ?\]))
+                  (delete-char 1)))))
+          (forward-char 1))))))
+
   (defun my/json-format-on-save ()
-    "Pretty-print the current JSON buffer with json.el."
+    "Strip trailing commas, then pretty-print the current JSON buffer."
     (when (derived-mode-p 'json-ts-mode)
+      (my/json-strip-trailing-commas)
       (json-pretty-print-buffer)))
 
   (defun my/json-enable-format-on-save ()
