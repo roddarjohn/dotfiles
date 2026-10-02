@@ -1,0 +1,84 @@
+-- ~/.psqlrc — power user config
+-- Silence the noise while this file loads
+\set QUIET 1
+
+---------------------------------------------------------------------------
+-- Prompt: user@host:port/db, with transaction state
+--   %x shows  *  inside a transaction,  !  in a failed transaction
+---------------------------------------------------------------------------
+\set PROMPT1 '%[%033[1;32m%]%n@%M:%>%[%033[0m%]/%[%033[1;34m%]%/%[%033[0m%]%[%033[1;31m%]%x%[%033[0m%]%R%# '
+\set PROMPT2 '%[%033[1;33m%]%R%[%033[0m%] '
+
+---------------------------------------------------------------------------
+-- Output
+---------------------------------------------------------------------------
+\pset null '∅'
+\pset linestyle unicode
+\pset border 2
+\x auto
+\timing on
+
+---------------------------------------------------------------------------
+-- Pager: pspg (https://github.com/okbob/pspg)
+--   Theme and most options live in ~/.pspgconf (see the pspgconf file).
+--   Flags here only cover things the config file doesn't:
+--   --quit-if-one-screen  small results print directly, no pager
+--   -c 1                  freeze the first column while scrolling sideways
+--   Falls back to less on machines without pspg.
+---------------------------------------------------------------------------
+\set has_pspg `command -v pspg >/dev/null 2>&1 && echo 1 || echo 0`
+\if :has_pspg
+  \setenv PAGER 'pspg --quit-if-one-screen -c 1'
+  -- Live-updating \watch output inside pspg (PostgreSQL 15+)
+  \setenv PSQL_WATCH_PAGER 'pspg --stream'
+\else
+  \setenv PAGER 'less -SFXRi'
+\endif
+\pset pager on
+
+---------------------------------------------------------------------------
+-- Behavior
+---------------------------------------------------------------------------
+-- A typo inside a transaction won't abort the whole thing (interactive only)
+\set ON_ERROR_ROLLBACK interactive
+-- Autocomplete keywords in UPPERCASE
+\set COMP_KEYWORD_CASE upper
+-- Separate history file per database
+\set HISTFILE ~/.psql_history- :DBNAME
+\set HISTCONTROL ignoredups
+\set HISTSIZE 20000
+-- Show error location details; switch with \set VERBOSITY verbose when debugging
+\set VERBOSITY default
+
+---------------------------------------------------------------------------
+-- Saved queries — run them by typing :name  (e.g.  :activity)
+---------------------------------------------------------------------------
+
+-- Server info
+\set version 'SELECT version();'
+\set uptime 'SELECT now() - pg_postmaster_start_time() AS uptime;'
+\set settings 'SELECT name, setting, unit, source FROM pg_settings WHERE source NOT IN (''default'', ''override'') ORDER BY name;'
+
+-- What's running right now
+\set activity 'SELECT pid, usename, application_name AS app, client_addr, state, wait_event_type, wait_event, now() - query_start AS duration, left(query, 80) AS query FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND state <> ''idle'' ORDER BY duration DESC NULLS LAST;'
+\set long_running 'SELECT pid, usename, now() - query_start AS duration, state, left(query, 100) AS query FROM pg_stat_activity WHERE state <> ''idle'' AND now() - query_start > interval ''5 minutes'' ORDER BY duration DESC;'
+\set idle_in_tx 'SELECT pid, usename, now() - state_change AS idle_for, left(query, 100) AS last_query FROM pg_stat_activity WHERE state LIKE ''idle in transaction%'' ORDER BY idle_for DESC;'
+\set blocking 'SELECT a.pid, a.usename, pg_blocking_pids(a.pid) AS blocked_by, now() - a.query_start AS waiting, left(a.query, 80) AS query FROM pg_stat_activity a WHERE cardinality(pg_blocking_pids(a.pid)) > 0 ORDER BY waiting DESC;'
+
+-- Sizes
+\set dbsizes 'SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size FROM pg_database ORDER BY pg_database_size(datname) DESC;'
+\set tablesizes 'SELECT n.nspname AS schema, c.relname AS table, pg_size_pretty(pg_total_relation_size(c.oid)) AS total, pg_size_pretty(pg_relation_size(c.oid)) AS heap, pg_size_pretty(pg_indexes_size(c.oid)) AS indexes, c.reltuples::bigint AS est_rows FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind IN (''r'', ''m'') AND n.nspname NOT IN (''pg_catalog'', ''information_schema'', ''pg_toast'') ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 25;'
+
+-- Health
+\set cache_hit 'SELECT (SELECT round(100.0 * sum(heap_blks_hit) / nullif(sum(heap_blks_hit) + sum(heap_blks_read), 0), 2) FROM pg_statio_user_tables) AS table_hit_pct, (SELECT round(100.0 * sum(idx_blks_hit) / nullif(sum(idx_blks_hit) + sum(idx_blks_read), 0), 2) FROM pg_statio_user_indexes) AS index_hit_pct;'
+\set dead_tuples 'SELECT schemaname, relname, n_live_tup, n_dead_tup, round(100.0 * n_dead_tup / nullif(n_live_tup + n_dead_tup, 0), 1) AS dead_pct, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20;'
+\set seq_scans 'SELECT schemaname, relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables WHERE seq_scan > 0 ORDER BY seq_tup_read DESC LIMIT 20;'
+\set unused_indexes 'SELECT s.schemaname, s.relname AS table, s.indexrelname AS index, pg_size_pretty(pg_relation_size(s.indexrelid)) AS size, s.idx_scan FROM pg_stat_user_indexes s JOIN pg_index i ON i.indexrelid = s.indexrelid WHERE s.idx_scan = 0 AND NOT i.indisunique AND NOT i.indisprimary ORDER BY pg_relation_size(s.indexrelid) DESC;'
+\set replication 'SELECT client_addr, application_name, state, sync_state, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn)) AS replay_lag FROM pg_stat_replication;'
+
+-- Top queries by total time (requires the pg_stat_statements extension, PG 13+)
+\set slow_queries 'SELECT round(total_exec_time::numeric, 1) AS total_ms, calls, round(mean_exec_time::numeric, 2) AS mean_ms, round((100 * total_exec_time / sum(total_exec_time) OVER ())::numeric, 1) AS pct, left(query, 100) AS query FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;'
+
+---------------------------------------------------------------------------
+\set QUIET 0
+\echo 'Shortcuts: :activity :long_running :idle_in_tx :blocking :tablesizes :dbsizes :cache_hit :dead_tuples :seq_scans :unused_indexes :slow_queries :replication :settings :uptime'

@@ -40,7 +40,8 @@ sudo apt install \
   pandoc \
   wget \
   unzip \
-  fontconfig
+  fontconfig \
+  pspg
 ```
 
 ### oh-my-zsh
@@ -100,7 +101,7 @@ The install script will:
    well as managed roots. Stop the applications that own those paths and
    manually migrate historical folds or foreign links to real directories
    first. With real paths, link tracked files via non-folding stow
-   (`zsh`, `tmux`, `emacs`, `bin`, `pi`, `claude`)
+   (`zsh`, `tmux`, `emacs`, `bin`, `pi`, `claude`, `postgres`)
 2. Install [tpm](https://github.com/tmux-plugins/tpm) (tmux plugin manager)
 3. Install the Meslo Nerd Font
 4. Configure the COSMIC Terminal font
@@ -130,6 +131,14 @@ Configures key bindings and the [tmux-nova](https://github.com/o0th/tmux-nova)
 status line theme. Uses tpm for plugin management. Also enables extended key
 reporting (`extended-keys on` / `extended-keys-format csi-u`) so modified keys
 like `Shift+Enter` survive inside the [pi](https://pi.dev) coding agent.
+
+### PostgreSQL
+
+`postgres/.psqlrc` sets a color prompt (with transaction state), unicode
+linestyle output, timing, per-database history, and a set of `:name`-style
+saved queries. `postgres/.pspgconf` configures the [pspg](https://github.com/okbob/pspg)
+pager (Solarized dark theme, smart-case search, scrollbar, bold labels).
+`psqlrc` auto-detects pspg and falls back to `less` when it's absent.
 
 ### pi
 

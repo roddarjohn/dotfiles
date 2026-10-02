@@ -146,7 +146,7 @@ section "1. Packages"
 if [ "$PLATFORM" = "linux" ]; then
     # README "System packages" + build deps for tree-sitter and Emacs pgtk.
     PACKAGES=(
-        stow tmux zsh git pandoc wget unzip fontconfig curl
+        stow tmux zsh git pandoc wget unzip fontconfig curl pspg
         build-essential
         autoconf automake texinfo
         libgtk-3-dev libjansson-dev libgnutls28-dev libsqlite3-dev
@@ -162,7 +162,7 @@ else
     # from the README ("System packages" subset that isn't system-
     # provided on macOS).
     PACKAGES=(
-        stow tmux git pandoc wget
+        stow tmux git pandoc wget pspg
         autoconf automake texinfo pkg-config
         gnutls libxml2 jansson
     )

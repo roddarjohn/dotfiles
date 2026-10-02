@@ -36,6 +36,15 @@
 
   (setq straight-use-package-by-default t)
 
+  ;; Emacs 30 is stricter than older releases: `eglot' calls
+  ;; `require-with-check' on its built-in dependencies and hard-errors if
+  ;; a straight-installed copy (e.g. GNU ELPA's `project') shadows the
+  ;; bundled one on the load-path.  Treat the dynamic built-ins as
+  ;; built-in so straight skips them as transitive dependencies instead
+  ;; of cloning a shadowing copy.
+  (setq straight-built-in-pseudo-packages
+        (append straight-built-in-pseudo-packages '(project xref)))
+
   ;; Pull recipe repositories only on a clean install — i.e. when at
   ;; least one of the recipe repos hasn't been cloned yet. On an
   ;; existing install this is a no-op, so startup stays fast.
@@ -64,6 +73,12 @@
 ** global
 #+begin_src emacs-lisp
   (setq inhibit-startup-message t)
+
+  ;; `track-changes' (used by Eglot to watch buffer edits) warns loudly
+  ;; when some package fires the before/after-change hooks unbalanced.  The
+  ;; recovery is non-fatal and self-healing; silence the banner and stop
+  ;; accumulating the error log.
+  (setq track-changes-record-errors nil)
 
   (fset 'yes-or-no-p 'y-or-n-p)
   (global-set-key (kbd "<f5>") 'revert-buffer)
@@ -1042,6 +1057,37 @@ I don't fully use this right now. Perhaps I should.
 
 #+RESULTS:
 | ruff-enable-on-save |
+
+** ruff diagnostics (flymake)
+   Live =ruff check= diagnostics surfaced through Flymake, running
+   alongside Eglot's (Zuban) diagnostics.  Flymake merges backends into
+   one list, so Zuban and ruff coexist without touching the Rass routing
+   policy.  =flymake-ruff= runs =uv run ruff check= so the ruff version
+   and any plugin rules come from the project venv.
+
+   Flymake is built into Emacs, but =flymake-mode= is off by default and
+   only turns on once Eglot takes over a buffer.  Enable it explicitly
+   for Python so the ruff backend runs whether or not Eglot is managing
+   the buffer.
+
+#+begin_src emacs-lisp
+  (use-package flymake-ruff
+    :ensure t
+    :custom
+    (flymake-ruff-program '("uv" "run" "ruff"))
+    :config
+    (defun my/python-flymake-enable ()
+      "Register the ruff backend and keep Flymake on for Python buffers.
+Eglot replaces `flymake-diagnostic-functions' and toggles
+`flymake-mode' when it starts or stops managing a buffer, so re-assert
+both afterwards while in a Python buffer."
+      (when (derived-mode-p 'python-mode 'python-ts-mode)
+        (flymake-ruff-load)
+        (flymake-mode 1)))
+    (add-hook 'python-mode-hook #'my/python-flymake-enable)
+    (add-hook 'python-ts-mode-hook #'my/python-flymake-enable)
+    (add-hook 'eglot-managed-mode-hook #'my/python-flymake-enable))
+#+end_src
 
 * tree-sitter
    Grammar sources are declared here so a fresh machine can pull

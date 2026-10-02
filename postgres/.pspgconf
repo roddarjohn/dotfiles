@@ -1,0 +1,20 @@
+# ~/.pspgconf — pspg settings
+#
+# Theme: 17 = Solarized dark.  Other good ones:
+#   18 = Solarized light, 1 = Midnight Commander, 2 = FoxPro, 12 = Paradox
+# Theme numbers can shift between pspg versions; press F9 -> theme menu
+# inside pspg to preview them all on live data.
+theme = 17
+
+# Search: case-insensitive unless the pattern contains uppercase (smart case)
+ignore_lower_case = true
+
+# Visuals
+bold_labels = true
+bold_cursor = true
+highlight_odd_rec = true
+show_scrollbar = true
+vertical_cursor = true
+
+# Quiet
+no_sound = true
