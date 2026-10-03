@@ -2,6 +2,17 @@
 -- Silence the noise while this file loads
 \set QUIET 1
 
+-- Apply the interactive UI (prompt, pretty output, timing, pager, saved-
+-- query banner) only when psql's *stdout* is a terminal.  Scripts (psql -c / -tAc /
+-- heredocs / Nx tasks) pipe stdout, so they keep default formatting and emit no
+-- extra rows; `psql ... | grep -q ...` under `set -o pipefail` stays intact.
+-- A `\set` backtick runs with its own stdout piped, so `[ -t 1 ]` is useless here;
+-- interrogate psql's real fd 1 via the parent PID instead (lsof on macOS, /proc on
+-- Linux).  Tty names look like /dev/ttys002 or /dev/pts/0; pipes show as ->0x...
+\set INTERACTIVE `{ lsof -a -p $PPID -d 1 -Fn 2>/dev/null || readlink /proc/$PPID/fd/1 2>/dev/null; } | grep -qE '/dev/(ttys?[0-9]*|pts/[0-9]+)' && echo 1 || echo 0`
+
+\if :INTERACTIVE
+
 ---------------------------------------------------------------------------
 -- Prompt: user@host:port/db, with transaction state
 --   %x shows  *  inside a transaction,  !  in a failed transaction
@@ -15,7 +26,6 @@
 \pset null '∅'
 \pset linestyle unicode
 \pset border 2
-\x auto
 \timing on
 
 ---------------------------------------------------------------------------
@@ -80,5 +90,7 @@
 \set slow_queries 'SELECT round(total_exec_time::numeric, 1) AS total_ms, calls, round(mean_exec_time::numeric, 2) AS mean_ms, round((100 * total_exec_time / sum(total_exec_time) OVER ())::numeric, 1) AS pct, left(query, 100) AS query FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;'
 
 ---------------------------------------------------------------------------
-\set QUIET 0
 \echo 'Shortcuts: :activity :long_running :idle_in_tx :blocking :tablesizes :dbsizes :cache_hit :dead_tuples :seq_scans :unused_indexes :slow_queries :replication :settings :uptime'
+\endif
+
+\set QUIET 0
