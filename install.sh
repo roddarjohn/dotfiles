@@ -119,7 +119,7 @@ if [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" 
     echo "  • existing claude settings.json backed up to $(basename "$claude_backup")"
 fi
 
-STOW_PACKAGES=${DOTFILES_INSTALL_STOW_PACKAGES:-"zsh tmux emacs bin pi claude postgres"}
+STOW_PACKAGES=${DOTFILES_INSTALL_STOW_PACKAGES:-"zsh tmux emacs bin pi claude postgres git"}
 # shellcheck disable=SC2086 # Deliberate package-name word splitting.
 for pkg in $STOW_PACKAGES; do
     stow --no-folding "$pkg" --target="$HOME" --dir="$DOTFILES_DIR"

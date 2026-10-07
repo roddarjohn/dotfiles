@@ -1,0 +1,17 @@
+[user]
+  	name = Rodda John
+	email = rodda@fsh.org
+	
+[github]
+	user = roddarjohn
+	
+[credential "https://github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+	
+[credential "https://gist.github.com"]
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
+	
+[merge]
+	conflictstyle = diff3
