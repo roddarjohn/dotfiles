@@ -22,6 +22,8 @@
 #  12. syncthing                          (optional, prompted)
 #  13. pi (coding agent CLI)              (optional, prompted; needs npm)
 #  14. buildifier (Bazel/Starlark fmt)    (optional, prompted)
+#  15. delta (git diffs / magit-delta)    (optional, prompted; needs cargo)
+#  16. emacs-lsp-booster (LSP cache)      (optional, prompted; needs cargo)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -730,6 +732,52 @@ else
             fi
             ;;
         *) skip "buildifier" ;;
+    esac
+fi
+
+# ── 15. delta — syntax-highlighting git pager for magit-delta ───────
+# Backs the Emacs magit-delta mode (word-level, highlighted diffs).
+section "15. delta (optional)"
+if command -v delta >/dev/null 2>&1; then
+    skip "delta already installed"
+else
+    read -r -p "Install delta (git-delta)? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            if [ "$PLATFORM" = "darwin" ] && command -v brew >/dev/null 2>&1; then
+                step "Installing git-delta via Homebrew"
+                brew install git-delta
+                ok "delta installed"
+            elif command -v cargo >/dev/null 2>&1; then
+                step "Installing git-delta via cargo"
+                cargo install git-delta
+                ok "delta installed"
+            else
+                warn "neither brew nor cargo found; install delta manually"
+            fi
+            ;;
+        *) skip "delta" ;;
+    esac
+fi
+
+# ── 16. emacs-lsp-booster — LSP response cache for eglot-booster ─────
+# Backs the Emacs eglot-booster mode (lower LSP latency on big repos).
+section "16. emacs-lsp-booster (optional)"
+if command -v emacs-lsp-booster >/dev/null 2>&1; then
+    skip "emacs-lsp-booster already installed"
+else
+    read -r -p "Install emacs-lsp-booster via cargo? [y/N] " answer
+    case "${answer:-}" in
+        [yY]*)
+            if command -v cargo >/dev/null 2>&1; then
+                step "Installing emacs-lsp-booster via cargo"
+                cargo install emacs-lsp-booster
+                ok "emacs-lsp-booster installed"
+            else
+                warn "cargo not found; install Rust first"
+            fi
+            ;;
+        *) skip "emacs-lsp-booster" ;;
     esac
 fi
 

@@ -39,11 +39,14 @@
   ;; Emacs 30 is stricter than older releases: `eglot' calls
   ;; `require-with-check' on its built-in dependencies and hard-errors if
   ;; a straight-installed copy (e.g. GNU ELPA's `project') shadows the
-  ;; bundled one on the load-path.  Treat the dynamic built-ins as
-  ;; built-in so straight skips them as transitive dependencies instead
-  ;; of cloning a shadowing copy.
+  ;; bundled one on the load-path.  Treat dynamic built-ins as built-in so
+  ;; straight skips them as transitive dependencies instead of cloning a
+  ;; shadowing copy.  `eglot' itself and its deps are listed because
+  ;; `eglot-booster' depends on eglot and would otherwise drag a
+  ;; straight-cloned eglot ahead of Emacs 30's bundled one.
   (setq straight-built-in-pseudo-packages
-        (append straight-built-in-pseudo-packages '(project xref)))
+        (append straight-built-in-pseudo-packages
+                '(project xref eglot eldoc external-completion jsonrpc flymake)))
 
   ;; Pull recipe repositories only on a clean install — i.e. when at
   ;; least one of the recipe repos hasn't been cloned yet. On an
@@ -243,13 +246,14 @@
   (global-set-key (kbd "C-c =") #'my/insert-box)
   (global-set-key (kbd "C-c +") #'my/insert-box-verbose)
 #+end_src
-** beacon
+** pulsar
+   Replaces the unmaintained =beacon=: pulses the current line after
+   point moves or the window scrolls.
 #+begin_src emacs-lisp
-     (use-package beacon
+     (use-package pulsar
        :ensure t
        :config
-       (beacon-mode 1)
-       (setq beacon-color "#666000"))
+       (pulsar-global-mode 1))
 #+end_src
 ** hungry-delete
 #+begin_src emacs-lisp
@@ -308,27 +312,21 @@ When using the which-key menu, you can use C-h and then n, p, or d to
 go to the next page, previous page, or enable docstrings.
 
    #+BEGIN_SRC emacs-lisp
+     ;; which-key is built into Emacs 30; no install needed.
      (use-package which-key
-       :ensure t
-       :config (which-key-mode))
+       :ensure nil
+       :config (which-key-mode 1))
    #+END_SRC
 
 ** theme
-   flatland sets =diff-added= / =diff-removed= =:background= to nil, which
-   Emacs 30 rejects with a warning. Rewrite nil colour values to
-   =unspecified= while the theme loads, then drop the advice.
+   gruvbox, the retro-groove palette. Contrast variants:
+   =gruvbox-dark-medium= (default), =gruvbox-dark-soft=,
+   =gruvbox-dark-hard=, =gruvbox-dark=. Swap the =load-theme= line to taste.
   #+begin_src emacs-lisp
-    (defun my/face-attr-nil->unspecified (args)
-      (cons (car args)
-            (cons (cadr args)
-                  (mapcar (lambda (x) (if (null x) 'unspecified x)) (cddr args)))))
-
-    (use-package flatland-theme
+    (use-package gruvbox-theme
       :ensure t
       :config
-      (advice-add 'set-face-attribute :filter-args #'my/face-attr-nil->unspecified)
-      (unwind-protect (load-theme 'flatland t)
-        (advice-remove 'set-face-attribute #'my/face-attr-nil->unspecified)))
+      (load-theme 'gruvbox-dark-medium t))
   #+end_src
 
   #+RESULTS:
@@ -348,7 +346,7 @@ go to the next page, previous page, or enable docstrings.
    #+end_src
 
 ** ace-window
-- [[https://github.com/Fanael/rainbow-delimiters][ace window]]
+- [[https://github.com/abo-abo/ace-window][ace window]]
 
    #+begin_src emacs-lisp
      (use-package ace-window
@@ -383,6 +381,20 @@ go to the next page, previous page, or enable docstrings.
     (tab-always-indent t)
     (text-mode-ispell-word-completion nil)
     (read-extended-command-predicate #'command-completion-default-include-p))
+#+end_src
+
+** cape
+   Extra completion-at-point backends (dabbrev, filename, elisp symbol)
+   for buffers without a running language server; Eglot-managed buffers
+   keep LSP-only completion. With corfu off outside Eglot, these fire
+   via =M-TAB= / =C-M-i=.
+#+begin_src emacs-lisp
+  (use-package cape
+    :ensure t
+    :init
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+    (add-to-list 'completion-at-point-functions #'cape-file)
+    (add-to-list 'completion-at-point-functions #'cape-elisp-symbol))
 #+end_src
 
 ** consult
@@ -722,6 +734,50 @@ Project management in emacs
     :ensure t
     :after magit)
 #+end_src
+** git diff & code review
+   diff-hl marks changed lines in the fringe and keeps magit refresh in
+   sync; magit-delta renders richer word-level, syntax-highlighted diffs
+   (needs the =delta= binary, installed by =bootstrap.sh=);
+   git-messenger shows blame at point; git-timemachine steps a file
+   through its history; git-link copies a GitHub permalink to the current
+   line (run via =M-x git-link=); magit-imerge adds interactive
+   merge-conflict resolution on top of =smerge-mode=. `forge` above
+   covers the PR/issue browse-and-merge loop; the stale =code-review=
+   package was dropped with it.
+#+begin_src emacs-lisp
+  (use-package diff-hl
+    :ensure t
+    :hook ((magit-pre-refresh . diff-hl-magit-pre-refresh)
+           (magit-post-refresh . diff-hl-magit-post-refresh))
+    :config
+    (global-diff-hl-mode)
+    (add-hook 'dired-mode-hook #'diff-hl-dired-mode))
+
+  (use-package magit-delta
+    :ensure t
+    :after magit
+    :config
+    ;; magit-delta-mode calls the =delta= binary on every diff render and
+    ;; errors when it's missing, which breaks magit refresh / staging. Only
+    ;; enable it once delta is installed (bootstrap.sh section 15).
+    (when (executable-find "delta")
+      (add-hook 'magit-mode-hook #'magit-delta-mode)))
+
+  (use-package git-messenger
+    :ensure t
+    :bind ("C-x v p" . git-messenger:popup-message))
+
+  (use-package git-timemachine
+    :ensure t
+    :bind ("C-x v t" . git-timemachine-toggle))
+
+  (use-package git-link
+    :ensure t)
+
+  (use-package magit-imerge
+    :ensure t
+    :after magit)
+#+end_src
 ** ibuffer
 - on first installation you'll need to run all-the-icons-install-fonts
 
@@ -911,9 +967,7 @@ I don't fully use this right now. Perhaps I should.
     (with-eval-after-load 'bookmark
       (keymap-set bookmark-bmenu-mode-map "C-o" #'casual-bookmarks-tmenu))
     (with-eval-after-load 'org-agenda
-      (keymap-set org-agenda-mode-map "C-o" #'casual-agenda-tmenu))
-    (with-eval-after-load 'symbol-overlay
-      (keymap-set symbol-overlay-map "C-o" #'casual-symbol-overlay-tmenu)))
+      (keymap-set org-agenda-mode-map "C-o" #'casual-agenda-tmenu)))
 #+end_src
 
 #+RESULTS:
@@ -1854,6 +1908,21 @@ return a non-nil contact without signalling."
   (add-hook 'css-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'css-ts-mode-hook 'my/eglot-ensure-maybe)
   (add-hook 'just-ts-mode-hook 'my/eglot-ensure-maybe)
+#+end_src
+** eglot-booster
+   Caches LSP responses to cut latency on large repos. Needs the
+   =emacs-lsp-booster= binary, installed optionally by =bootstrap.sh=.
+   Not on MELPA, so pulled straight from GitHub.
+#+begin_src emacs-lisp
+  (use-package eglot-booster
+    :straight (eglot-booster :type git :host github :repo "jdtsmith/eglot-booster")
+    :after eglot
+    :config
+    ;; eglot-booster-mode errors when the =emacs-lsp-booster= binary is
+    ;; missing; only enable it once the binary is installed (bootstrap.sh
+    ;; section 16).
+    (when (executable-find "emacs-lsp-booster")
+      (eglot-booster-mode 1)))
 #+end_src
 ** Python: BasedPyright completion + Zuban diagnostics
    Python uses one Eglot connection backed by exactly two ordered servers.
