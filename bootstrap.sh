@@ -23,7 +23,7 @@
 #  13. pi (coding agent CLI)              (optional, prompted; needs npm)
 #  14. buildifier (Bazel/Starlark fmt)    (optional, prompted)
 #  15. delta (git diffs / magit-delta)    (optional, prompted; needs cargo)
-#  16. emacs-lsp-booster (LSP cache)      (optional, prompted; needs cargo)
+#  16. emacs-lsp-booster (LSP cache)      (optional, prompted; GitHub release)
 #
 # Re-running is safe: every phase checks for already-done state and
 # skips if so. On a fresh machine the Emacs source build dominates the
@@ -762,19 +762,38 @@ fi
 
 # ── 16. emacs-lsp-booster — LSP response cache for eglot-booster ─────
 # Backs the Emacs eglot-booster mode (lower LSP latency on big repos).
+# Installs the prebuilt GitHub release (no Rust toolchain). macOS arm64
+# runs the x86_64 build under Rosetta 2.
+EMACS_LSP_BOOSTER_VERSION="0.2.1"
 section "16. emacs-lsp-booster (optional)"
 if command -v emacs-lsp-booster >/dev/null 2>&1; then
     skip "emacs-lsp-booster already installed"
 else
-    read -r -p "Install emacs-lsp-booster via cargo? [y/N] " answer
+    read -r -p "Install emacs-lsp-booster from GitHub releases? [y/N] " answer
     case "${answer:-}" in
         [yY]*)
-            if command -v cargo >/dev/null 2>&1; then
-                step "Installing emacs-lsp-booster via cargo"
-                cargo install emacs-lsp-booster
-                ok "emacs-lsp-booster installed"
+            case "$PLATFORM-$ARCH" in
+                darwin-*)
+                    LSP_BOOSTER_ASSET="emacs-lsp-booster_v${EMACS_LSP_BOOSTER_VERSION}_x86_64-apple-darwin.zip" ;;
+                linux-x86_64)
+                    LSP_BOOSTER_ASSET="emacs-lsp-booster_v${EMACS_LSP_BOOSTER_VERSION}_x86_64-unknown-linux-musl.zip" ;;
+                *)
+                    LSP_BOOSTER_ASSET="" ;;
+            esac
+            if [ -z "$LSP_BOOSTER_ASSET" ]; then
+                warn "No prebuilt release for $PLATFORM/$ARCH; install via cargo instead"
             else
-                warn "cargo not found; install Rust first"
+                step "Downloading $LSP_BOOSTER_ASSET"
+                LSP_BOOSTER_TMP="$(mktemp -d)"
+                curl -fsSL \
+                    "https://github.com/blahgeek/emacs-lsp-booster/releases/download/v${EMACS_LSP_BOOSTER_VERSION}/${LSP_BOOSTER_ASSET}" \
+                    -o "$LSP_BOOSTER_TMP/$LSP_BOOSTER_ASSET"
+                step "Extracting emacs-lsp-booster"
+                unzip -o "$LSP_BOOSTER_TMP/$LSP_BOOSTER_ASSET" -d "$LSP_BOOSTER_TMP" >/dev/null
+                mkdir -p "$HOME/.local/bin"
+                install -m 0755 "$LSP_BOOSTER_TMP/emacs-lsp-booster" "$HOME/.local/bin/emacs-lsp-booster"
+                rm -rf "$LSP_BOOSTER_TMP"
+                ok "emacs-lsp-booster installed to ~/.local/bin"
             fi
             ;;
         *) skip "emacs-lsp-booster" ;;
